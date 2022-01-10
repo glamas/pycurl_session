@@ -37,116 +37,116 @@ if __name__ == "__main__":
 ```
 
 ## API
-from pycurl_session.spider.schedule.Schedule(custom_settings={})
-    Parameters:
-        - custom_settings - 自定义设置。[可配置项参考](../pycurl_session/spider/settings.py):
-            - BOT - 用于标识cookie。默认"Spider"
-            - USER_AGENT - 默认ua，会被DEFAULT_HEADERS["user-agent"]覆盖。默认"Spider Bot"
-            - DEFAULT_HEADERS - 默认headers
-            - ROBOTSTXT_OBEY - 是否遵守robots.txt。默认True
-            - COOKIES_DEBUG - 是否打印cookie
-            - COOKIES_STORE_ENABLED - 是否保存cookie到sqlite3文件。默认True
-            - COOKIES_STORE_DB - cookie保存文件位置。默认为临时目录
-            - COOKIES_CLEAR - 启动时是否清空对应标识的cookie
-            - DOWNLOAD_TIMEOUT - 下载超时设置。默认30(second)
-            - DOWNLOAD_DELAY - 相同域名请求延时。默认0(second)
-            - REDIRECT_ENABLED - 是否自动跳转请求。默认True
-            - RETRY_TIMES - 最大重试次数，默认3
-            - RETRY_HTTP_CODES - 重试状态码。默认[500, 502, 503, 504, 522, 524, 408, 429]
-            - LOG_ENABLED - 是否记录日志。默认False
-            - LOG_FILE - 日志文件路径，需要LOG_ENABLED=True
-            - LOG_ENCODING - 日志编码。默认utf-8
-            - LOG_FORMAT - 日志格式。默认"%(asctime)s %(levelname)s [%(name)s] %(message)s"
-            - CONCURRENT_REQUESTS - 同时请求连接数。默认16
-            - DOWNLOADER_MIDDLEWARES - (list) 下载中间件
-            - ITEM_PIPELINES - (list) Item管道
+from pycurl_session.spider.schedule.Schedule(custom_settings={}) 
+    Parameters: 
+        - custom_settings - 自定义设置。[可配置项参考](../pycurl_session/spider/settings.py): 
+            - BOT - 用于标识cookie。默认"Spider" 
+            - USER_AGENT - 默认ua，会被DEFAULT_HEADERS["user-agent"]覆盖。默认"Spider Bot" 
+            - DEFAULT_HEADERS - 默认headers 
+            - ROBOTSTXT_OBEY - 是否遵守robots.txt。默认True 
+            - COOKIES_DEBUG - 是否打印cookie 
+            - COOKIES_STORE_ENABLED - 是否保存cookie到sqlite3文件。默认True 
+            - COOKIES_STORE_DB - cookie保存文件位置。默认为临时目录 
+            - COOKIES_CLEAR - 启动时是否清空对应标识的cookie 
+            - DOWNLOAD_TIMEOUT - 下载超时设置。默认30(second) 
+            - DOWNLOAD_DELAY - 相同域名请求延时。默认0(second) 
+            - REDIRECT_ENABLED - 是否自动跳转请求。默认True 
+            - RETRY_TIMES - 最大重试次数，默认3 
+            - RETRY_HTTP_CODES - 重试状态码。默认[500, 502, 503, 504, 522, 524, 408, 429] 
+            - LOG_ENABLED - 是否记录日志。默认False 
+            - LOG_FILE - 日志文件路径，需要LOG_ENABLED=True 
+            - LOG_ENCODING - 日志编码。默认utf-8 
+            - LOG_FORMAT - 日志格式。默认"%(asctime)s %(levelname)s [%(name)s] %(message)s" 
+            - CONCURRENT_REQUESTS - 同时请求连接数。默认16 
+            - DOWNLOADER_MIDDLEWARES - (list) 下载中间件 
+            - ITEM_PIPELINES - (list) Item管道 
 
-add_spider(spider, task_provider=Task, \*\*arg)
-    Parameters:
-        - spider(Spider) - Spider类
-        - task_provider(Task) - Task继承类。用于生成请求
-        - arg - spider初始化参数
+add_spider(spider, task_provider=Task, \*\*arg) 
+    Parameters: 
+        - spider(Spider) - Spider类 
+        - task_provider(Task) - Task继承类。用于生成请求 
+        - arg - spider初始化参数 
 
-run() 启动调度请求
+run() 启动调度请求 
 
-session - pycurl_session.Session()实例
-settings - (dict) 全部设置
-logstat - (dict) 数据统计
+session - pycurl_session.Session()实例 
+settings - (dict) 全部设置 
+logstat - (dict) 数据统计 
 
-class pycurl_session.spider.Spider()
-start_request()
-    可选，生成器函数。优先于start_urls。和start_urls只取一个
-    Return:
-        - Request
+class pycurl_session.spider.Spider() 
+start_request() 
+    可选，生成器函数。优先于start_urls。和start_urls只取一个 
+    Return: 
+        - Request 
 
-parse(response)
-    Parameters:
-        - response(Response) - 响应类
+parse(response) 
+    Parameters: 
+        - response(Response) - 响应类 
 
-log(msg)
-    Parameters:
-        - msg(str) - 日志信息
+log(msg) 
+    Parameters: 
+        - msg(str) - 日志信息 
 
-closed(reason)
-    Parameters:
-        - reason(str) - 结束原因
+closed(reason) 
+    Parameters: 
+        - reason(str) - 结束原因 
 
-name - (str) 爬虫名称
-spider_id - (str) 爬虫标识，由Spider.__class__.__name__和Spider.name组成
-start_urls - (list) 初始链接。默认callback为parse()
-_session - (Session) Schedule.session
-settings - (dict) Schedule.settings
-
-
-class pycurl_session.spider.request.Request(url, callback, meta={}, dont_filter=False, \*\*args)
-    Parameters:
-        - url(str) - 请求链接
-        - callback(function) - 回调函数
-        - meta(dict) - 数据传递。以下key是特殊值
-            - cookiejar(str) - 指定cookie标识
-            - dont_redirect(bool) - 是否自动跳转
-        - dont_filter(bool) - 是否过滤
-        - \*\*args - 其他Session.get()的参数
-
-_run_callback(response) - 保留函数，用于调用
-
-class pycurl_session.spider.request.FormRequest(url, callback, meta={}, dont_filter=False, \*\*args)
-    Parameters:
-        - url(str) - 请求链接
-        - callback(function) - 回调函数
-        - meta(dict) - 数据传递。以下key是特殊值
-            - cookiejar(str) - 指定cookie标识
-            - dont_redirect(bool) - 是否自动跳转
-        - dont_filter(bool) - 是否过滤
-        - \*\*args - 其他Session.get()的参数
-            - formdata(dict) - 表单数据
-
-from_response(response, form_id=None, form_name="", form_num=0, method="POST", action=None, formdata=None, files=None, callback=None, \*\*args)
-    Parameters:
-        - response(Response) - 响应类
-        - form_id(str) - 表单id
-        - form_name(str) - 表单名称
-        - form_num(int) - 表单序号。依次按form_id，form_name，form_num获取表单
-        - method(str) - 请求方式
-        - action(str) - 指定表单的action。默认会从获取的表单里拿
-        - formdata(dict) - 指定表单数据
-        - files(dict) - 文件发送
-        - callback(function) - 回调函数
-        - \*\*args - 其他Session.get()的参数
-    Return:
-        - Request
-
-class pycurl_session.spider.exception.IgnoreRequest()
-用于下载中间件。`raise IgnoreRequest()`将丢弃Request。
-
-class pycurl_session.spider.exception.DropItem()
-用于Item管道。`raise DropItem()`将丢弃Item。
+name - (str) 爬虫名称 
+spider_id - (str) 爬虫标识，由Spider.__class__.__name__和Spider.name组成 
+start_urls - (list) 初始链接。默认callback为parse() 
+_session - (Session) Schedule.session 
+settings - (dict) Schedule.settings 
 
 
-class pycurl_session.spider.mailsender.MailSender(host=None, port=25, login_user=None, login_password=None, tls=False, ssl=True)
-set_host(host, port=25, tls=False, ssl=True)
-login(login_user, login_password)
-send(mailfrom, mailto, subject, body, cc=None, attachs=(), minetype="text/plain", charset="utf-8")
+class pycurl_session.spider.request.Request(url, callback, meta={}, dont_filter=False, \*\*args) 
+    Parameters: 
+        - url(str) - 请求链接 
+        - callback(function) - 回调函数 
+        - meta(dict) - 数据传递。以下key是特殊值 
+            - cookiejar(str) - 指定cookie标识 
+            - dont_redirect(bool) - 是否自动跳转 
+        - dont_filter(bool) - 是否过滤 
+        - \*\*args - 其他Session.get()的参数 
+
+_run_callback(response) - 保留函数，用于调用 
+
+class pycurl_session.spider.request.FormRequest(url, callback, meta={}, dont_filter=False, \*\*args) 
+    Parameters: 
+        - url(str) - 请求链接 
+        - callback(function) - 回调函数 
+        - meta(dict) - 数据传递。以下key是特殊值 
+            - cookiejar(str) - 指定cookie标识 
+            - dont_redirect(bool) - 是否自动跳转 
+        - dont_filter(bool) - 是否过滤 
+        - \*\*args - 其他Session.get()的参数 
+            - formdata(dict) - 表单数据 
+
+from_response(response, form_id=None, form_name="", form_num=0, method="POST", action=None, formdata=None, files=None, callback=None, \*\*args) 
+    Parameters: 
+        - response(Response) - 响应类 
+        - form_id(str) - 表单id 
+        - form_name(str) - 表单名称 
+        - form_num(int) - 表单序号。依次按form_id，form_name，form_num获取表单 
+        - method(str) - 请求方式 
+        - action(str) - 指定表单的action。默认会从获取的表单里拿 
+        - formdata(dict) - 指定表单数据 
+        - files(dict) - 文件发送 
+        - callback(function) - 回调函数 
+        - \*\*args - 其他Session.get()的参数 
+    Return: 
+        - Request 
+
+class pycurl_session.spider.exception.IgnoreRequest() 
+用于下载中间件。`raise IgnoreRequest()`将丢弃Request。 
+
+class pycurl_session.spider.exception.DropItem() 
+用于Item管道。`raise DropItem()`将丢弃Item。 
+
+
+class pycurl_session.spider.mailsender.MailSender(host=None, port=25, login_user=None, login_password=None, tls=False, ssl=True) 
+set_host(host, port=25, tls=False, ssl=True) 
+login(login_user, login_password) 
+send(mailfrom, mailto, subject, body, cc=None, attachs=(), minetype="text/plain", charset="utf-8") 
 
 ## 扩展
 ### 下载中间件
