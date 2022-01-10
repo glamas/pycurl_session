@@ -1,7 +1,7 @@
 # pycurl_session
-本项目是对pycurl进行了封装，目的是使pycurl可以像requests.Session和scrapy一样使用，但功能精简。
-本项目是业余开发，功能上会不完善，请谨慎使用。
-本项目没有发布到pypi等分发平台。
+本项目是对pycurl进行了封装，目的是使pycurl可以像requests.Session和scrapy一样使用，但功能精简。  
+本项目是业余开发，功能上会不完善，请谨慎使用。  
+本项目没有发布到pypi等分发平台。  
 
 ## 依赖
 - pycurl -- 主要。windows的第三方编译版本可以从[这里下载](https://www.lfd.uci.edu/~gohlke/pythonlibs/#pycurl)
