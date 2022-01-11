@@ -16,7 +16,7 @@ import pycurl
 from pycurl_session import Session
 from pycurl_session.response import Response
 from pycurl_session.spider import settings
-from pycurl_session.spider.exceptions import IgnoreRequest, DropItem
+from pycurl_session.spider.exceptions import IgnoreRequest, DropItem, CloseSpider
 from pycurl_session.spider.middleware import Statistics, RobotsTxt, Cookies
 from pycurl_session.spider.request import Request
 from pycurl_session.spider.task import TaskItem, Task
@@ -267,6 +267,8 @@ class Schedule(object):
                     self.run_pipeline(new_request, spider)
         except StopIteration:
             pass
+        except CloseSpider:
+            self.manual_close_task(spider)
         finally:
             return ret, new_request
 
@@ -297,6 +299,8 @@ class Schedule(object):
                         self.run_pipeline(result, spider)
                 except StopIteration:
                     continue
+                except CloseSpider:
+                    self.manual_close_task(spider)
                 except Exception as e:
                     self.logger.exception(e)
                     continue
@@ -488,6 +492,8 @@ class Schedule(object):
                 self.queue_pending.append(TaskItem(spider_id, ret))
             if new_request:
                 self.queue_pending.append(TaskItem(spider_id, new_request))
+        except CloseSpider:
+            self.manual_close_task(spider)
         except Exception as e:
             spider._get_logger().exception(e)
         c.close()
@@ -519,6 +525,12 @@ class Schedule(object):
                 )
             )
         return
+
+    def manual_close_task(self, spider):
+        spider.log("CloseSpider raised")
+        spider_id = spider.spider_id
+        if spider_id in self.spider_task:
+            self.spider_task.pop(spider_id)
 
     def process_close_call(self):
         # running_spider = [queue_item[0] for queue_item in self.queue_pending]
