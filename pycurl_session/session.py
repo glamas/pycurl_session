@@ -685,13 +685,13 @@ class Session(object):
                             continue
                         expires = kv.split("=")[1].strip()
                         expires_origin = expires
-                        expires = expires.replace("-", "").replace("+", "").strip()
+                        expires = expires.replace("-", " ").replace("+", "").strip()
                         if "," in expires:
                             expires = expires[expires.find(",") + 1 :].strip()
                         if "gmt" not in expires.lower():
                             # not endswith('GMT'), endswith('0000')
                             if len(expires.split(" ")[-1]) == 4:
-                                expires = expires[: -5]
+                                expires = expires[: -4].strip()
                         else:
                             expires = expires.replace("gmt", "").replace("GMT", "").strip()
                         if len(expires.split(" ")[2]) == 2:
