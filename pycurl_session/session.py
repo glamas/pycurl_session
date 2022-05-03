@@ -435,10 +435,7 @@ class Session(object):
             c.setopt(pycurl.SSL_VERIFYPEER, 0)
             c.setopt(pycurl.SSL_VERIFYHOST, 0)
         if self._ssl_cipher_list:
-            if self.version_info[3].lower() == "windows" and self.version_info[5].lower() == "schannel":
-                pass
-            else:
-                c.setopt(pycurl.SSL_CIPHER_LIST, self._ssl_cipher_list)
+            c.setopt(pycurl.SSL_CIPHER_LIST, self._ssl_cipher_list)
 
 
     def _prepare_request_headers(self, c, headers, url):
