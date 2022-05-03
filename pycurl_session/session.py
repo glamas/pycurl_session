@@ -54,6 +54,7 @@ class Session(object):
 
         self._fh = None
         self._ssl_cipher_list = "ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH"
+        self.version_info = pycurl.version_info()
         self._verify = True
 
     def set_cookie_db(self, cookie_db_path):
@@ -434,7 +435,10 @@ class Session(object):
             c.setopt(pycurl.SSL_VERIFYPEER, 0)
             c.setopt(pycurl.SSL_VERIFYHOST, 0)
         if self._ssl_cipher_list:
-            c.setopt(pycurl.SSL_CIPHER_LIST, self._ssl_cipher_list)
+            if self.version_info[3].lower() == "windows" and self.version_info[5].lower() == "schannel":
+                pass
+            else:
+                c.setopt(pycurl.SSL_CIPHER_LIST, self._ssl_cipher_list)
 
 
     def _prepare_request_headers(self, c, headers, url):
@@ -680,10 +684,16 @@ class Session(object):
                         if expires:  # max-age already
                             continue
                         expires = kv.split("=")[1].strip()
-                        expires = expires.replace("gmt", "").replace("GMT", "").strip()
+                        expires_origin = expires
+                        expires = expires.replace("-", "").replace("+", "").strip()
                         if "," in expires:
                             expires = expires[expires.find(",") + 1 :].strip()
-                        expires = expires.replace("-", " ")
+                        if "gmt" not in expires.lower():
+                            # not endswith('GMT'), endswith('0000')
+                            if len(expires.split(" ")[-1]) == 4:
+                                expires = expires[: -5]
+                        else:
+                            expires = expires.replace("gmt", "").replace("GMT", "").strip()
                         if len(expires.split(" ")[2]) == 2:
                             dt_format = "%d %b %y %H:%M:%S"
                         else:
@@ -691,7 +701,9 @@ class Session(object):
                         try:
                             dt = datetime.strptime(expires, dt_format)
                         except ValueError:
-                            raise
+                            logger.warning("Cannot format cookie expires: {}".format(expires_origin))
+                            expires = ""
+                            continue
                         expires = int((dt - datetime(1970, 1, 1)).total_seconds())
                     elif kv.lower().startswith("max-age="):
                         expires = int(time.time()) + int(kv.split("=")[1].strip())
