@@ -53,7 +53,7 @@ class Session(object):
         self._timeout = 30
 
         self._fh = None
-        self._ssl_cipher_list = "ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH"
+        self._ssl_cipher_list = None # "ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH"
         self.version_info = pycurl.version_info()
         self._verify = True
 
