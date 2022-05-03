@@ -444,11 +444,7 @@ class Session(object):
 
         request_headers = self.headers.copy()
         request_headers = {key.lower().strip(): val for key, val in request_headers.items()}
-        if url_info.port is None or url_info.port in [80, 443]:
-            host = "{0}".format(domain)
-        else:
-            host = "{0}:{1}".format(domain, url_info.port)
-        request_headers.update({"host": host})
+        request_headers.update({"host": domain})
 
         request_referer = None
         if headers and isinstance(headers, dict):
