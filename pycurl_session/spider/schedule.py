@@ -527,8 +527,8 @@ class Schedule(object):
         return
 
     def manual_close_task(self, spider):
-        spider.log("CloseSpider raised")
         spider_id = spider.spider_id
+        spider.log("{} raise CloseSpider()".format(spider_id))
         if spider_id in self.spider_task:
             self.spider_task.pop(spider_id)
 
@@ -600,5 +600,5 @@ class Schedule(object):
         for middleware in self.middleware:
             if hasattr(middleware, "process_logstat"):
                 self.logstat.update(middleware.process_logstat())
-        self.logger.info("\n" + json.dumps(self.logstat, sort_keys=True, indent=4, separators=(',', ': ')))
+        self.logger.info("Dumping logstat:\n" + json.dumps(self.logstat, sort_keys=True, indent=4, separators=(',', ': ')))
         # ========== logstat end ==========
