@@ -603,8 +603,7 @@ class Schedule(object):
         loop_init = True
         while loop_init or self.num_handles > 0 or len(self.queue_pending) > 0:
             loop_init = False
-            # update self.cm
-            self.collect_curl_multi()
+            to_collect = False
 
             while 1:
                 ret, self.num_handles = self.cm.perform()
@@ -614,9 +613,15 @@ class Schedule(object):
             num_q, ok_list, err_list = self.cm.info_read()
             for c in ok_list:
                 self.process_curl_multi_ok(c)
+                to_collect = True
 
             for c, errno, errmsg in err_list:
                 self.process_curl_multi_err(c, errno, errmsg)
+                to_collect = True
+
+            if self.num_handles == 0 or to_collect:
+                # update self.cm
+                self.collect_curl_multi()
         # ========== main loop end ==========
 
         # all spider done, spider call closed() and item pipeline call close_spider()
