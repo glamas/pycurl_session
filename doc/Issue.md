@@ -3,11 +3,13 @@
 
 RobotsTxt 虽然是一个下载中间件，但不参与下载中间件的管道循环，并且优先级比较高，执行完之后才会进入下载中间件的循环
 
-重定向和请求重试，暂时不能放入下载中间件，因为涉及到c变量的操作，然而c变量不作为下载中间件的参数。
-目前重定向和请求重试，在下载中间件管道循环后运行。如果在下载中间件返回相同的request，会因为重复过滤而取消请求
+重定向，暂时不能放入下载中间件，因为涉及到c变量的操作，然而c变量不作为下载中间件的参数。
+目前重定向在下载中间件管道循环后运行。如果在下载中间件返回相同的request，会因为重复过滤而取消请求
+
+请求重试目前已经可以在下载中间件的process_exception()操作，通过raise RetryRequest()异常来判断
 
 只对GET请求进行重复过滤判断，表单发送的method是get也会过滤
 
 CurlMulti的select()设置为0.001，不可调。是为了避免重定向或者超时时，主循环cpu占用过高
 
-下载中间件管道循环，按DOWNLOADER_MIDDLEWARES的顺序执行process_request，逆序执行process_response。
+下载中间件管道循环，按DOWNLOADER_MIDDLEWARES的顺序执行process_request，逆序执行process_response和process_exception。

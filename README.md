@@ -68,7 +68,7 @@ if __name__ == "__main__":
 - [x] 使用curlmulti进行多线程请求
 - [x] 支持相同域名的延时请求设置(DOWNLOAD_DELAY)
 - [x] item pipeline，支持yield返回字典，仅支持process_item和close_spider
-- [x] 下载中间件，仅支持process_request和process_response，不支持process_exception。另外新增支持process_logstat用于统计
+- [x] 下载中间件，仅支持process_request，process_response和process_exception。另外新增支持process_logstat用于统计
 - [x] 重复请求判断，依据callback和spider_id组合，即不同Spider请求或者请求的callback不一样，不会被过滤
 - [x] 爬虫结束调用closed()
 - [x] 日志设置和自定义格式化

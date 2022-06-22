@@ -162,6 +162,10 @@ class MyDownloadMiddleware:
     def process_response(self, request, response, spider):
         self.response_count += 1
 
+    def process_exception(self, request, exception, spider):
+        logger = spider._get_logger()
+        logger.error("ERROR: {0}, {1}".format(exception.errno, exception.errmsg))
+
     def process_logstat(self):
         return {"my_count": {"request_count": self.request_count, "response_count": self.response_count}}
 
@@ -239,7 +243,7 @@ Task初始化只支持传入Spider实例，即add_spider()的第一个参数，�
 - 只支持process_item()和close_spider()
 
 ### Downloader Middleware
-- 只支持process_request()/process_response()
+- 只支持process_request(), process_response()和process_exception()。没有from_crawler()
 
 ### Request/FormRequest
 - 参数没有body，可以通过data参数，但不支持bytes类型
@@ -251,6 +255,3 @@ Task初始化只支持传入Spider实例，即add_spider()的第一个参数，�
 ### Response
 - body是str类型，只读。可以通过text设置。在Scrapy里body是bytes类型
 - 没有copy()/replace()/follow()/follow_all()函数
-
-### Exception
-- 暂时不支持CloseSpider，后续增加
