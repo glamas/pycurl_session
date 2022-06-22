@@ -16,7 +16,7 @@ import pycurl
 from pycurl_session import Session
 from pycurl_session.response import Response
 from pycurl_session.spider import settings
-from pycurl_session.spider.exceptions import IgnoreRequest, DropItem, CloseSpider
+from pycurl_session.spider.exceptions import IgnoreRequest, DropItem, CloseSpider, PerformError, RetryRequest
 from pycurl_session.spider.middleware import Statistics, RobotsTxt, Cookies
 from pycurl_session.spider.request import Request
 from pycurl_session.spider.task import TaskItem, Task
@@ -238,6 +238,7 @@ class Schedule(object):
             args.update({"method": method})
         else:
             method = args["method"]
+        request.method = method
         if "cookiejar" in request.meta:
             args["session_id"] = request.meta["cookiejar"]
             self.set_multi_cookiejar(request.meta["cookiejar"])
@@ -399,49 +400,10 @@ class Schedule(object):
         while len(self.queue_delay) > 0:
             self.queue_pending.appendleft(self.queue_delay.pop())
 
-    def process_curl_multi_ok(self, c):
+    def process_response(self, response, c):
         spider_id = c.spider_id
         spider = self.spider_instance[spider_id]
-
-        self.cm.remove_handle(c)
-        if c in self.curl_handles[c.top_domain]["handles"]:
-            self.curl_handles[c.top_domain]["handles"].remove(c)
-            self.curl_handles[c.top_domain]["last"] = time.time() # todo
-
-        response = self.session.gather_response(c)
         perform_time = c.getinfo(pycurl.TOTAL_TIME)
-        response.meta = c.meta
-        response.headers = c.response_headers
-
-        # ========== Middleware start ==========
-        get_new_queue_item = False
-        for m_index in range(len(self.middleware), 0, -1):
-            middleware = self.middleware[m_index - 1]
-            if hasattr(middleware, "process_response"):
-                # ret:
-                #   None: continue, next middleware
-                #   Request: replace old request
-                #   Response: finish request
-                # or raise IgnoreRequest: drop queue_item, break loop
-                try:
-                    ret = middleware.process_response(c.spider_request, response, spider)
-                    if ret is None: continue
-                    if isinstance(ret, Request):
-                        self.queue_pending.append(TaskItem(spider_id, ret))
-                        get_new_queue_item = True
-                        break
-                    if isinstance(ret, Response):
-                        response = ret
-                        break
-                except IgnoreRequest:
-                    get_new_queue_item = True
-                    break
-                except Exception as e:
-                    spider._get_logger().exception(e)
-        if get_new_queue_item:
-            c.close()
-            return
-        # ========== Middleware end ==========
         if response.status_code in [301, 302] and (
             (
                 "dont_redirect" not in response.meta
@@ -499,36 +461,102 @@ class Schedule(object):
         c.close()
         return
 
+    def process_curl_multi_ok(self, c):
+        spider_id = c.spider_id
+        spider = self.spider_instance[spider_id]
+
+        self.cm.remove_handle(c)
+        if c in self.curl_handles[c.top_domain]["handles"]:
+            self.curl_handles[c.top_domain]["handles"].remove(c)
+            self.curl_handles[c.top_domain]["last"] = time.time() # todo
+
+        response = self.session.gather_response(c)
+        response.meta = c.meta
+        response.headers = c.response_headers
+
+        # ========== Middleware start ==========
+        get_new_queue_item = False
+        for m_index in range(len(self.middleware), 0, -1):
+            middleware = self.middleware[m_index - 1]
+            if hasattr(middleware, "process_response"):
+                # ret:
+                #   None: continue, next middleware
+                #   Request: replace old request
+                #   Response: finish request
+                # or raise IgnoreRequest: drop queue_item, break loop
+                try:
+                    ret = middleware.process_response(c.spider_request, response, spider)
+                    if ret is None: continue
+                    if isinstance(ret, Request):
+                        self.queue_pending.append(TaskItem(spider_id, ret))
+                        get_new_queue_item = True
+                        break
+                    if isinstance(ret, Response):
+                        response = ret
+                        break
+                except IgnoreRequest:
+                    get_new_queue_item = True
+                    break
+                except Exception as e:
+                    spider._get_logger().exception(e)
+        if get_new_queue_item:
+            c.close()
+            return
+        # ========== Middleware end ==========
+        # ========== process_response start ==========
+        self.process_response(response, c)
+        # ========== process_response end ==========
+
     def process_curl_multi_err(self, c, errno, errmsg):
+        spider_id = c.spider_id
+        spider = self.spider_instance[spider_id]
+
         self.cm.remove_handle(c)
         self.curl_handles[c.top_domain]["handles"].remove(c)
-        if errno == 28:
-            c.retry += 1
-            if c.retry < self.settings["RETRY_TIMES"]:
-                self.cm.add_handle(c)
-                self.curl_handles[c.top_domain]["handles"].append(c)
-                self.curl_handles[c.top_domain]["last"] = time.time()
-                self.num_handles += 1
-                msg = "Timeout ({0}, {1}) when <{2} {3}>".format(
-                    errno, errmsg, c.request["method"], c.request["url"]
-                )
-            else:
-                msg = "Failed to process <{0} {1}>, try max time.".format(
-                    c.request["method"], c.request["url"]
-                )
-            self.logger.error(msg)
+        # ========== Middleware start ==========
+        get_new_queue_item = False
+        for m_index in range(len(self.middleware), 0, -1):
+            middleware = self.middleware[m_index - 1]
+            if hasattr(middleware, "process_exception"):
+                # ret:
+                #   None: continue, next middleware
+                #   Request: replace old request
+                #   Response: finish request
+                # or raise RetryRequest: retry request, break loop
+                try:
+                    ret = middleware.process_exception(c.spider_request, PerformError(errno, errmsg), spider)
+                    if ret is None: continue
+                    if isinstance(ret, Request):
+                        self.queue_pending.append(TaskItem(spider_id, ret))
+                        get_new_queue_item = True
+                        break
+                    if isinstance(ret, Response):
+                        self.process_response(ret, c)
+                        break
+                except RetryRequest:
+                    c.retry += 1
+                    if c.retry < self.settings["RETRY_TIMES"]:
+                        self.cm.add_handle(c)
+                        self.curl_handles[c.top_domain]["handles"].append(c)
+                        self.curl_handles[c.top_domain]["last"] = time.time()
+                        self.num_handles += 1
+                        # middleware control log
+                    else:
+                        msg = "Failed to process <{0} {1}>, try max time.".format(
+                            c.request["method"], c.request["url"]
+                        )
+                        self.logger.error(msg)
+                    break
+                except Exception as e:
+                    spider._get_logger().exception(e)
+        if get_new_queue_item:
+            c.close()
             return
-        else:
-            self.logger.error(
-                "Error ({0}, {1}) when <{2} {3}>".format(
-                    errno, errmsg, c.request["method"], c.request["url"]
-                )
-            )
-        return
+        # ========== Middleware end ==========
 
     def manual_close_task(self, spider):
         spider_id = spider.spider_id
-        spider.log("{} raise CloseSpider()".format(spider_id))
+        spider.log("{} raise CloseSpider(). No more request will be add to queue.".format(spider_id))
         if spider_id in self.spider_task:
             self.spider_task.pop(spider_id)
 

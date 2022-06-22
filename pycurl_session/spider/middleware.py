@@ -8,7 +8,7 @@ from pycurl_session.response import Response
 from pycurl_session.spider.spider import Spider
 from pycurl_session.spider.request import Request
 from pycurl_session.spider.robotstxtparser import RobotFileParser
-from pycurl_session.spider.exceptions import IgnoreRequest
+from pycurl_session.spider.exceptions import IgnoreRequest, RetryRequest
 
 
 class Statistics:
@@ -16,8 +16,11 @@ class Statistics:
         self.url_collector = {}
         self.stat = {"time_start": time.time()}
 
-    def status_count(self, status_code):
-        key = "status_count/{0}".format(status_code)
+    def section_count(self, section, code=None):
+        if code:
+            key = "{0}/{1}".format(section, code)
+        else:
+            key = "{0}".format(section)
         if key not in self.stat:
             self.stat.update({key: 1})
         else:
@@ -63,7 +66,22 @@ class Statistics:
             return None
 
     def process_response(self, request, response, spider):
-        self.status_count(response.status_code)
+        self.section_count("status_count", response.status_code)
+
+    def process_exception(self, request, exception, spider):
+        logger = spider._get_logger()
+        if exception.errno == 28:
+            self.section_count("timeout_count", exception.errno)
+            logger.error("Timeout ({0}, {1}) when <{2} {3}>".format(
+                exception.errno, exception.errmsg, request.method, request.url
+            ))
+            raise RetryRequest()
+        else:
+            self.section_count("error_count", exception.errno)
+            logger.error( "Error ({0}, {1}) when <{2} {3}>".format(
+                    exception.errno, exception.errmsg, request.method, request.url
+            ))
+            return None
 
     def process_logstat(self):
         for k, url_item in self.url_collector.items():
