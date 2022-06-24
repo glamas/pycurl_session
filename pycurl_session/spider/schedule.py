@@ -601,25 +601,27 @@ class Schedule(object):
         # ========== schedule info end ==========
         # ========== main loop start ==========
         loop_init = True
+        running_handles = 0
         while loop_init or self.num_handles > 0 or len(self.queue_pending) > 0:
             loop_init = False
-            to_collect = False
 
             while 1:
                 ret, self.num_handles = self.cm.perform()
                 if ret != pycurl.E_CALL_MULTI_PERFORM:
                     break
             self.cm.select(0.001)
-            num_q, ok_list, err_list = self.cm.info_read()
-            for c in ok_list:
-                self.process_curl_multi_ok(c)
-                to_collect = True
+            if running_handles != self.num_handles:
+                running_handles = self.num_handles
+                num_q, ok_list, err_list = self.cm.info_read()
+                for c in ok_list:
+                    self.process_curl_multi_ok(c)
 
-            for c, errno, errmsg in err_list:
-                self.process_curl_multi_err(c, errno, errmsg)
-                to_collect = True
+                for c, errno, errmsg in err_list:
+                    self.process_curl_multi_err(c, errno, errmsg)
+                # update self.cm
+                self.collect_curl_multi()
 
-            if self.num_handles == 0 or to_collect:
+            if self.num_handles == 0:
                 # update self.cm
                 self.collect_curl_multi()
         # ========== main loop end ==========
