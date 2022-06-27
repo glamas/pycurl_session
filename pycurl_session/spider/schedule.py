@@ -54,6 +54,7 @@ class Schedule(object):
         self.spider_task = {}
         self.middleware = []
         self.pipeline = []
+        self.spider_close_reason = {}
 
         self.robotstxt = RobotsTxt()
         self.set_middleware()
@@ -268,8 +269,8 @@ class Schedule(object):
                     self.run_pipeline(new_request, spider)
         except StopIteration:
             pass
-        except CloseSpider:
-            self.manual_close_task(spider)
+        except CloseSpider as reason:
+            self.manual_close_task(spider, reason)
         finally:
             return ret, new_request
 
@@ -300,8 +301,8 @@ class Schedule(object):
                         self.run_pipeline(result, spider)
                 except StopIteration:
                     continue
-                except CloseSpider:
-                    self.manual_close_task(spider)
+                except CloseSpider as reason:
+                    self.manual_close_task(spider, reason)
                 except Exception as e:
                     self.logger.exception(e)
                     continue
@@ -454,8 +455,8 @@ class Schedule(object):
                 self.queue_pending.append(TaskItem(spider_id, ret))
             if new_request:
                 self.queue_pending.append(TaskItem(spider_id, new_request))
-        except CloseSpider:
-            self.manual_close_task(spider)
+        except CloseSpider as reason:
+            self.manual_close_task(spider, reason)
         except Exception as e:
             spider._get_logger().exception(e)
         c.close()
@@ -554,11 +555,12 @@ class Schedule(object):
             return
         # ========== Middleware end ==========
 
-    def manual_close_task(self, spider):
+    def manual_close_task(self, spider, reason=None):
         spider_id = spider.spider_id
-        spider.log("{} raise CloseSpider(). No more request will be add to queue.".format(spider_id))
+        spider.log("{} raise CloseSpider(). No more new request will be added to queue.".format(spider_id))
         if spider_id in self.spider_task:
             self.spider_task.pop(spider_id)
+        self.spider_close_reason.update({spider_id: reason})
 
     def process_close_call(self):
         for spider_id, spider in self.spider_instance.items():
@@ -576,8 +578,10 @@ class Schedule(object):
 
             # spider closed()
             if hasattr(spider, "closed"):
-                reason = "done"
+                reason = "finished"
                 try:
+                    if spider_id in self.spider_close_reason:
+                        reason = self.spider_close_reason[spider_id]
                     spider.closed(reason)
                 except Exception as e:
                     spider._get_logger().exception(e)
@@ -593,29 +597,39 @@ class Schedule(object):
         # ========== schedule info end ==========
         # ========== main loop start ==========
         loop_init = True
+        to_update_cm = True
         running_handles = 0
         while loop_init or self.num_handles > 0 or len(self.queue_pending) > 0:
             loop_init = False
+            try:
+                while 1:
+                    ret, self.num_handles = self.cm.perform()
+                    if ret != pycurl.E_CALL_MULTI_PERFORM:
+                        break
+                self.cm.select(0.001)
+                if running_handles != self.num_handles:
+                    running_handles = self.num_handles
+                    num_q, ok_list, err_list = self.cm.info_read()
+                    for c in ok_list:
+                        self.process_curl_multi_ok(c)
 
-            while 1:
-                ret, self.num_handles = self.cm.perform()
-                if ret != pycurl.E_CALL_MULTI_PERFORM:
+                    for c, errno, errmsg in err_list:
+                        self.process_curl_multi_err(c, errno, errmsg)
+                    if to_update_cm:
+                        self.collect_curl_multi()
+
+                if self.num_handles == 0 and to_update_cm:
+                    self.collect_curl_multi()
+            except KeyboardInterrupt:
+                if to_update_cm == True:
+                    to_update_cm = False
+                    self.logger.info("KeyboardInterrupt raised. No more new request will be added to queue. You can send CTRL-c again to shut down schedule.")
+                    continue
+                else:
+                    for spider_id, _ in self.spider_instance.items():
+                        if spider_id not in self.spider_close_reason:
+                            self.spider_close_reason.update({spider_id: "shutdown"})
                     break
-            self.cm.select(0.001)
-            if running_handles != self.num_handles:
-                running_handles = self.num_handles
-                num_q, ok_list, err_list = self.cm.info_read()
-                for c in ok_list:
-                    self.process_curl_multi_ok(c)
-
-                for c, errno, errmsg in err_list:
-                    self.process_curl_multi_err(c, errno, errmsg)
-                # update self.cm
-                self.collect_curl_multi()
-
-            if self.num_handles == 0:
-                # update self.cm
-                self.collect_curl_multi()
         # ========== main loop end ==========
 
         # all spider done, spider call closed() and item pipeline call close_spider()

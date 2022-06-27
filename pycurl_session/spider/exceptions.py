@@ -13,8 +13,11 @@ class DropItem(Exception):
         pass
 
 class CloseSpider(Exception):
-    def __init__(self):
-        pass
+    def __init__(self, reason=None):
+        self.reason = reason if reason else "cancelled"
+
+    def __str__(self):
+        return self.reason
 
 class PerformError(Exception):
     def __init__(self, errno, errmsg):
