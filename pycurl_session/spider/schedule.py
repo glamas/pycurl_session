@@ -561,15 +561,7 @@ class Schedule(object):
             self.spider_task.pop(spider_id)
 
     def process_close_call(self):
-        # running_spider = [queue_item[0] for queue_item in self.queue_pending]
-        # running_spider.extend([c.spider_id for domain, handles in self.curl_handles.items() for c in handles["handles"]])
         for spider_id, spider in self.spider_instance.items():
-            # if spider_id in running_spider: continue
-            # clean spider_task
-            # if spider_id in self.spider_task:
-            #     if self.spider_task[spider_id].count <= 0:
-            #         self.spider_task.pop(spider_id)
-            
             # item pipeline close_spider()
             for pipline in self.pipeline:
                 if hasattr(pipline, "close_spider"):
