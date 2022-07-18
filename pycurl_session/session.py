@@ -80,41 +80,32 @@ class Session(object):
             logger.addHandler(self._fh)
 
     def get(self, url, **args):
-        c = self.prepare_curl_handle("GET", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("GET", url=url, **args)
 
     def post(self, url, **args):
-        c = self.prepare_curl_handle("POST", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("POST", url=url, **args)
 
     def put(self, url, **args):
-        c = self.prepare_curl_handle("PUT", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("PUT", url=url, **args)
 
     def patch(self, url, **args):
-        c = self.prepare_curl_handle("PATCH", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("PATCH", url=url, **args)
 
     def options(self, url, **args):
-        c = self.prepare_curl_handle("OPTIONS", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("OPTIONS", url=url, **args)
 
     def head(self, url, **args):
-        c = self.prepare_curl_handle("HEAD", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("HEAD", url=url, **args)
 
     def delete(self, url, **args):
-        c = self.prepare_curl_handle("DELETE", url=url, c=self.c, **args)
-        response = self.request(c)
-        return response
+        return self.request("DELETE", url=url, **args)
 
-    def request(self, c):
+    def request(self, method, url, **args):
+        if "c" in args:
+            if isinstance(args["c"], pycurl.Curl):
+                self.c = args["c"]
+            args.pop("c")
+        c = self.prepare_curl_handle(method, url=url, c=self.c, **args)
         while True:
             if c.retry > self._retry_time:
                 break
