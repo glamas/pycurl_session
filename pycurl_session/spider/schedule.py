@@ -5,6 +5,7 @@ import sys
 import importlib
 import json
 import logging
+import platform
 import time
 
 from collections import deque
@@ -593,6 +594,16 @@ class Schedule(object):
         if not self.init_success: return
         # ========== schedule info start ==========
         self.logger.info("Schedule started")
+        backend_info = {
+            "OS": {
+                "node": platform.node(),
+                "platform": platform.platform(),
+                "processor": platform.processor(),
+            },
+            "Python version": sys.version,
+            "PycURL version": pycurl.version_info(),
+        }
+        self.logger.info("Backend info: {0}".format(backend_info))
         self.logger.info("Overridden settings: {0}".format(self.settings))
         self.logger.info("Enabled spider: {0}".format(list(self.spider_task.keys())))
         self.logger.info("Spider started")
