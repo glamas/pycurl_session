@@ -243,6 +243,8 @@ class Schedule(object):
         if "cookiejar" in request.meta:
             args["session_id"] = request.meta["cookiejar"]
             self.set_multi_cookiejar(request.meta["cookiejar"])
+        if "c" in args and not isinstance(args["c"], pycurl.Curl):
+            args.pop("c")
         c = self.session.prepare_curl_handle(url=url, **args)
         c.meta = request.meta
         c.top_domain = top_domain
