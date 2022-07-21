@@ -237,7 +237,7 @@ r = s.get(url, auth=MyAuth('xxx'))  ## 只需要传递一次，后续会自动�
 - auth不支持元组，只支持HTTPAUTH实列。requests支持auth=(user, pass)
 - auth是一个字典，格式是{domain: HTTPAUTH}。requests里是一个元组
 - files参数只支持dict{field: path} 或者{field: [pathlist, ...]}。并且data参数里，如果值的第一个字符是'@'，会认为是文件路径。requests里，value部分需要是一个元组。
-- 在Spider内提供了Request，但Session没有，可以通过设置Session.c，并请求request(c)。requests里，可以通过Request.prepare()设置请求，send()发送
+- 在Spider内提供了Request，但Session没有。requests里，可以通过Request.prepare()设置请求，send()发送
 - data不支持分块上传函数。requests里，data可以传入一个生成器函数
 - verify只支持Boolean，不支持字符串，由cert来指定路径，并且没有Session.verify，cert文件默认由certifi.where()来查找。requests里，verify可以设置路径，Session.verify可以设置默认路径，cert支持元组，包括key和certfile
 - 不支持hooks逻辑。requests里，hooks参数可以指定一些callback操作
