@@ -8,7 +8,7 @@ import re
 import json
 from lxml import etree
 from io import BytesIO
-from urllib.parse import urlparse, parse_qs, urlencode, urljoin, quote, unquote
+from urllib.parse import urlparse, quote, unquote
 from urllib.parse import ParseResult, urlunparse
 
 default_port = {
@@ -170,6 +170,17 @@ class Client:
         else:
             self.url = "{0}{1}".format(self.base_url, self._pwd)
             return self._pwd
+
+    def set_verbose(self, verbose):
+        self.verbose = 1 if verbose else 0
+        self.c.setopt(pycurl.VERBOSE, self.verbose)
+        self.c.setopt(pycurl.DEBUGFUNCTION, self._debug_callback)
+        self.response_headers = []
+        self.c.setopt(pycurl.HEADERFUNCTION, self._header_handle)
+
+    def _header_handle(self, header_line):
+            header_line = header_line.decode("utf-8")
+            self.response_headers.append(header_line.strip())
 
     def _debug_callback(self, debug_type, debug_msg):
         # print("{0}: {1}".format(debug_type, debug_msg))
@@ -496,15 +507,6 @@ class FTP(_FTP_common):
     '''
     def __init__(self, url=None, login="", password=""):
         _FTP_common.__init__(self, url, login, password)
-        self.c.setopt(pycurl.VERBOSE, 1)
-        self.c.setopt(pycurl.DEBUGFUNCTION, self._debug_callback)
-        self.response_headers = []
-        self.c.setopt(pycurl.HEADERFUNCTION, self.header_handle)
-        # self.c.setopt(pycurl.HEADER, 1)
-
-    def header_handle(self, header_line):
-            header_line = header_line.decode("utf-8")
-            self.response_headers.append(header_line.strip())
 
     def _action(self, action, src=None, dst=None, nobody=True):
         ''' https://www.ietf.org/rfc/rfc959.txt
