@@ -10,7 +10,7 @@ import tempfile
 import uuid
 from datetime import datetime
 from io import BytesIO
-from urllib.parse import urlparse, parse_qs, urlencode, urljoin, unquote, quote
+from urllib.parse import urlparse, urlencode, urljoin, unquote, quote
 from pycurl_session.cache import CacheDB
 from pycurl_session.response import Response
 from pycurl_session.auth import HTTPAUTH, HTTPAUTH_BASIC

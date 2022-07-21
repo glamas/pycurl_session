@@ -11,7 +11,7 @@ import time
 from collections import deque
 from copy import deepcopy
 from inspect import isgenerator
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 
 import pycurl
 from pycurl_session import Session
