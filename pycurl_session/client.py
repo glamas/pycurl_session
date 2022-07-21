@@ -637,11 +637,7 @@ class WebDAV(Client):
             if method == "GET" and dst:
                 with open(dst, "wb") as f:
                     f.write(raw_data)
-                return raw_data
-            else:
-                data = raw_data.decode("utf-8")
-                # print(data)
-                return data
+            return raw_data
         except pycurl.error as e:
             # code, msg = e
             print(e)
@@ -649,7 +645,7 @@ class WebDAV(Client):
             self.c.setopt(pycurl.UPLOAD, 0)
             self.c.setopt(pycurl.HTTPHEADER, None)
 
-    def download(self, src, dst):
+    def download(self, src, dst=None):
         if self.status == "logout": return
         return self._action("GET", src=src, dst=dst)
 
