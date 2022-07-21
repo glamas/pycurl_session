@@ -575,8 +575,14 @@ class Session(object):
             if proxy_info.get("scheme"):
                 if proxy_info["scheme"].lower() == "socks5":
                     c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5)
+                if proxy_info["scheme"].lower() == "socks5h":
+                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5_HOSTNAME)
                 elif proxy_info["scheme"].lower() == "socks4":
                     c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4)
+                elif proxy_info["scheme"].lower() == "socks4a":
+                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4A)
+                # elif proxy_info["scheme"].lower() == "https":         # Added in 7.52.0 for OpenSSL, GnuTLS and NSS
+                #     c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_HTTPS)
                 else:
                     c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_HTTP)
             if proxy_info.get("port"):
