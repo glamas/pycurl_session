@@ -78,7 +78,7 @@ if __name__ == "__main__":
 - [x] 其他全局设置，请参考[Schedule](./doc/Schedule.zh-CN.md#全局设置)
 
 其他，仅测试
-`pycurl_session.client`可导入`FTP`，`SFTP`，`WEBDAV`进行对应协议请求
+`pycurl_session.client`可导入`FTP`，`SFTP`，`WEBDAV`进行对应协议请求。可以参考[Client](./doc/Client.zh-CN.md)
 
 ## 已知问题
 已知的不完善的地方，请参考[Issue](./doc/Issue.md)
