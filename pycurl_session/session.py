@@ -13,7 +13,7 @@ from io import BytesIO
 from urllib.parse import urlparse, parse_qs, urlencode, urljoin, unquote, quote
 from pycurl_session.cache import CacheDB
 from pycurl_session.response import Response
-from pycurl_session.auth import HTTPAUTH
+from pycurl_session.auth import HTTPAUTH, HTTPAUTH_BASIC
 
 import logging
 
@@ -187,7 +187,12 @@ class Session(object):
             url = url.replace(" ", "%20")
         url_info = urlparse(url)
         scheme = url_info.scheme
-        domain = url_info.netloc
+        domain = url_info.hostname
+
+        # check BASIC AUTH
+        if url_info.username:
+            auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
+            url = url[:url.find("//") + 2] + url[url.find(domain):]
 
         if scheme.lower() == "https":
             self._set_ssl(c)
@@ -437,7 +442,7 @@ class Session(object):
 
     def _prepare_request_headers(self, c, headers, url):
         url_info = urlparse(url)
-        domain = url_info.netloc
+        domain = url_info.hostname
 
         request_headers = self.headers.copy()
         request_headers = {key.lower().strip(): val for key, val in request_headers.items()}
