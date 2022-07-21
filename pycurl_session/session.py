@@ -244,13 +244,13 @@ class Session(object):
         #       files accept {field: path} or {field: path_list}
         #       data like 2
         #   4. json_data
-        #       will add or change "content-type" to "application/json" in header
+        #       will add or change "content-type" to "application/json" in header if not 'json' in content-type
         #       accept one of:
         #           a. @path            - string, for post one file
         #           b. {field: str}
         #           c. raw_str
         # for put or patch:
-        #   a. will add or change "content-type" to "application/json" in header
+        #   a. will add "content-type" to "application/json" in header if no content-type in header
         #   b. files > json_data > data, only one will use
         #       files only accept "@path" for one file
         #       json_data and data accept dict or raw_str, note: "@path" is string here
@@ -306,8 +306,14 @@ class Session(object):
                     c.setopt(pycurl.HTTPPOST, post_data)
             elif data is None and files is None and json_data is not None:
                 # application/json
-                if "content-type" in request_headers: request_headers.pop("content-type")
-                request_headers.update({"content-type": "application/json"})
+                if (
+                    "content-type" in request_headers
+                    and "json" not in request_headers["content-type"]
+                ):
+                    # remove content-type, if not json type
+                    request_headers.pop("content-type")
+                if "content-type" not in request_headers:
+                    request_headers.update({"content-type": "application/json"})
                 if (
                     isinstance(json_data, str)
                     and len(json_data) > 1
@@ -334,8 +340,8 @@ class Session(object):
                 c.setopt(pycurl.POSTFIELDS, "")
         elif method.lower() == "put" or method.lower() == "patch":
             # application/json
-            if "content-type" in request_headers: request_headers.pop("content-type")
-            request_headers.update({"content-type": "application/json"})
+            if "content-type" not in request_headers:
+                request_headers.update({"content-type": "application/json"})
             if method.lower() == "patch":
                 c.setopt(pycurl.CUSTOMREQUEST, "PATCH")
             if method.lower() == "put":
