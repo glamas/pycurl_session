@@ -34,7 +34,7 @@ set_logger(log_path=None)
     Parameters:  
         - log_path(str) - 设置日志保存路径，默认不保存  
 
-set_retry_time(times=3, backoff=[])  
+set_retry_times(times=3, backoff=[])  
     Parameters:  
         - times(int) - 设置重试次数  
         - backoff(list[int, float]) - 设置重试间隔  
