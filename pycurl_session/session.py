@@ -46,7 +46,7 @@ class Session(object):
         self.useragent = ""
         # self.response_headers = []
         self.history = []
-        self._retry_time = 3
+        self._retry_times = 3
         self._retry_interval = 5
         self._backoff = [self._retry_interval]
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
@@ -110,7 +110,7 @@ class Session(object):
 
     def send(self, c):
         while True:
-            if c.retry > self._retry_time:
+            if c.retry > self._retry_times:
                 break
             try:
                 c.perform()
@@ -129,18 +129,18 @@ class Session(object):
                     )
                 )
                 if response.status_code in self.retry_http_codes:
-                    self._response_retry(c, max_time=self._retry_time, logger_handle=logger)
+                    self._response_retry(c, max_time=self._retry_times, logger_handle=logger)
                     continue
                 break
             except pycurl.error as e:
                 ## todo: process error
                 code, msg = e.args
-                if code == 28 and c.retry < self._retry_time:
+                if code == 28 and c.retry < self._retry_times:
                     logger.error(msg)
                 else:
                     raise
                 c.retry += 1
-                if c.retry <= self._retry_time:
+                if c.retry <= self._retry_times:
                     logger.info("Retry [{0}] {1}".format(c.retry, c.request["url"]))
                     c.response_headers = []
                     c.buffer = BytesIO()
@@ -541,9 +541,9 @@ class Session(object):
                 )
         return c
 
-    def set_retry_time(self, times: int = 3, backoff: list = []):
+    def set_retry_times(self, times: int = 3, backoff: list = []):
         if times and int(times) > 0:
-            self._retry_time = times
+            self._retry_times = times
         if backoff and isinstance(backoff, list):
             self._backoff = [x for x in backoff if isinstance(x, (int, float))]
 
