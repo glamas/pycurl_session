@@ -106,6 +106,9 @@ class Session(object):
                 self.c = args["c"]
             args.pop("c")
         c = self.prepare_curl_handle(method, url=url, c=self.c, **args)
+        return self.send(c)
+
+    def send(self, c):
         while True:
             if c.retry > self._retry_time:
                 break
