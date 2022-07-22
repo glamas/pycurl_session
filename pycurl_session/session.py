@@ -178,10 +178,7 @@ class Session(object):
         c.retry = 0
         c.cert = cert
         c.verify = verify
-        if session_id:
-            c.session_id = session_id
-        elif not hasattr(c, "session_id"):
-            c.session_id = None
+        c.session_id = session_id if session_id else None
 
         if " " in url:
             url = url.replace(" ", "%20")
