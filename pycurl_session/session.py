@@ -20,6 +20,18 @@ import logging
 logger = logging.getLogger("pycurl_session")
 
 
+class HeaderHandle(object):
+    def __init__(self, c) -> None:
+        self.c = c
+
+    def write(self, header_line):
+        header_line = header_line.decode("iso-8859-1")
+        if ":" in header_line:
+            self.c.response_headers.append(header_line.strip())
+
+    def clear(self):
+        self.c.response_headers.clear()
+
 class Session(object):
     def __init__(self, session_id=None, store_cookie=True):
         if session_id:
@@ -101,11 +113,12 @@ class Session(object):
         return self.request("DELETE", url=url, **args)
 
     def request(self, method, url, **args):
+        c = self.c
         if "c" in args:
             if isinstance(args["c"], pycurl.Curl):
-                self.c = args["c"]
+                c = args["c"]
             args.pop("c")
-        c = self.prepare_curl_handle(method, url=url, c=self.c, **args)
+        c = self.prepare_curl_handle(method, url=url, c=c, **args)
         return self.send(c)
 
     def send(self, c):
@@ -142,13 +155,39 @@ class Session(object):
                 c.retry += 1
                 if c.retry <= self._retry_times:
                     logger.info("Retry [{0}] {1}".format(c.retry, c.request["url"]))
-                    c.response_headers = []
-                    c.buffer = BytesIO()
+                    c.request.clear()
+                    c.header_handle.clear()
+                    c.response_headers.clear()
+                    c.buffer.truncate(0)
+                    c.buffer.seek(0)
             except Exception as e:
                 logger.error(e, stack_info=True)
                 raise
-
         return response
+
+    def init_curl_var(self, c):
+        if hasattr(c, "request"):
+            c.request.clear()
+        else:
+            c.request = {}
+        if hasattr(c, "header_handle"):
+            c.header_handle.clear()
+        else:
+            c.header_handle = HeaderHandle(c)
+        if hasattr(c, "response_headers"):
+            c.response_headers.clear()
+        else:
+            c.response_headers = []
+        if hasattr(c, "buffer"):
+            c.buffer.truncate(0)
+            c.buffer.seek(0)
+        else:
+            c.buffer = BytesIO()
+        if not hasattr(c, "retry"): c.retry = 0
+        if not hasattr(c, "allow_redirects"): c.allow_redirects = True
+        if not hasattr(c, "proxy"): c.proxy = ""
+        if not hasattr(c, "cert"): c.cert = ""
+        if not hasattr(c, "verify"): c.verify = True
 
     def prepare_curl_handle(
         # fmt: off
@@ -167,6 +206,7 @@ class Session(object):
                     url: str
                     headers: dict
                     referer: str
+                header_handle: HeaderHandle
                 response_headers: list
                 buffer: BytesIO
                 retry: int
@@ -177,10 +217,7 @@ class Session(object):
         '''
         if c is None:
             c = pycurl.Curl()
-        c.request = {}
-        c.retry = 0
-        c.cert = cert
-        c.verify = verify
+        self.init_curl_var(c)
         c.session_id = session_id if session_id else None
 
         if " " in url:
@@ -395,15 +432,7 @@ class Session(object):
         c.setopt(pycurl.ENCODING, "")
         # c.setopt(pycurl.ENCODING, "gzip,deflate")
 
-        c.response_headers = []
-
-        def header_handle(header_line):
-            header_line = header_line.decode("iso-8859-1")
-            if ":" in header_line:
-                c.response_headers.append(header_line.strip())
-
-        c.setopt(pycurl.HEADERFUNCTION, header_handle)
-        c.buffer = BytesIO()
+        c.setopt(pycurl.HEADERFUNCTION, c.header_handle.write)
         c.setopt(pycurl.WRITEDATA, c.buffer)
         return c
 
@@ -413,7 +442,7 @@ class Session(object):
         response.headers = c.response_headers
         response.content = c.buffer
         response.url = c.getinfo(pycurl.EFFECTIVE_URL)
-        self.history.append(response.url)
+        # self.history.append(response.url)
         response.request.update(
             {
                 "url": c.request["url"],
@@ -511,7 +540,6 @@ class Session(object):
             )
 
         c = self.prepare_curl_handle("GET", url, c, headers={"referer": origin_url}, proxy=c.proxy)
-        return c
 
     def _response_retry(self, c, max_time=3, logger_handle=None):
         c.retry += 1
@@ -530,6 +558,8 @@ class Session(object):
                 )
             c.buffer.truncate(0)
             c.buffer.seek(0)
+            c.header_handle.clear()
+            c.response_headers.clear()
             time.sleep(sleep_time)
         else:
             if logger_handle:
@@ -539,7 +569,6 @@ class Session(object):
                         c.request["url"]
                     )
                 )
-        return c
 
     def set_retry_times(self, times: int = 3, backoff: list = []):
         if times and int(times) > 0:
