@@ -155,7 +155,6 @@ class Session(object):
                 c.retry += 1
                 if c.retry <= self._retry_times:
                     logger.info("Retry [{0}] {1}".format(c.retry, c.request["url"]))
-                    c.request.clear()
                     c.header_handle.clear()
                     c.response_headers.clear()
                     c.buffer.seek(0)
