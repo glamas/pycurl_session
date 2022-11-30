@@ -13,8 +13,8 @@ from pycurl_session.spider.exceptions import IgnoreRequest, RetryRequest
 
 class Statistics:
     def __init__(self):
-        self.url_collector = {}
-        self.stat = {"time_start": time.time()}
+        self.url_collector = set()
+        self.stat = {"time_start": time.time(), "time_end": None, "time_used": None}
 
     def section_count(self, section, code=None):
         if code:
@@ -29,20 +29,14 @@ class Statistics:
     def add_url(self, url, method="GET", callback_name="", spider=""):
         method = method.upper()
         key = "method_count/{0}".format(method)
-        if not key in self.url_collector:
-            self.url_collector.update({key: {}})
-        url_key = (url, callback_name, spider)
-        if url_key not in self.url_collector[key]:
-            self.url_collector[key].update({url_key: 0})
-        self.url_collector[key][url_key] += 1
+        url_key = (method, url, callback_name, spider)
+        if url_key not in self.url_collector:
+            self.url_collector.add(url_key)
+        self.section_count(key)
 
     def in_collection(self, url, method="GET", callback_name="", spider=""):
-        method = method.upper()
-        key = "method_count/{0}".format(method)
-        if not key in self.url_collector:
-            self.url_collector.update({key: {}})
-        if method == "GET":
-            return (url, callback_name, spider) in self.url_collector[key]
+        if method.upper() == "GET":
+            return (method, url, callback_name, spider) in self.url_collector
         else:
             return False
 
@@ -84,10 +78,6 @@ class Statistics:
             return None
 
     def process_logstat(self):
-        for k, url_item in self.url_collector.items():
-            if k not in self.stat: self.stat.update({k: 0})
-            for _, count in url_item.items():
-                self.stat[k] += count
         self.stat["time_end"] = time.time()
         self.stat["time_used"] = int((self.stat["time_end"] - self.stat["time_start"]) * 1000) / 1000
         self.stat["time_end"] = "{0}.{1}".format(
