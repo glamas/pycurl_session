@@ -158,8 +158,8 @@ class Session(object):
                     c.request.clear()
                     c.header_handle.clear()
                     c.response_headers.clear()
-                    c.buffer.truncate(0)
                     c.buffer.seek(0)
+                    c.buffer.truncate()
             except Exception as e:
                 logger.error(e, stack_info=True)
                 raise
@@ -179,8 +179,8 @@ class Session(object):
         else:
             c.response_headers = []
         if hasattr(c, "buffer"):
-            c.buffer.truncate(0)
             c.buffer.seek(0)
+            c.buffer.truncate()
         else:
             c.buffer = BytesIO()
         if not hasattr(c, "retry"): c.retry = 0
@@ -188,6 +188,8 @@ class Session(object):
         if not hasattr(c, "proxy"): c.proxy = ""
         if not hasattr(c, "cert"): c.cert = ""
         if not hasattr(c, "verify"): c.verify = True
+        # for spider
+        # if hasattr(c, "spider_request"): c.spider_request = None
 
     def prepare_curl_handle(
         # fmt: off
@@ -556,8 +558,8 @@ class Session(object):
                         c.request["url"],
                     )
                 )
-            c.buffer.truncate(0)
             c.buffer.seek(0)
+            c.buffer.truncate()
             c.header_handle.clear()
             c.response_headers.clear()
             time.sleep(sleep_time)
