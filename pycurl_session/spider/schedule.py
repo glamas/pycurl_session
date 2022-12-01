@@ -7,6 +7,7 @@ import json
 import logging
 import platform
 import time
+import gc
 
 from collections import deque
 from copy import deepcopy
@@ -48,6 +49,8 @@ class Schedule(object):
         self.cm = pycurl.CurlMulti()
         self.queue_pending = deque()
         self.queue_delay = deque()
+        self.curl_pool = deque()
+        self.curl_pool_max = min(16, self.settings["CONCURRENT_REQUESTS"] / 2 + 1)
         self.curl_handles = {}
         self.num_handles = 0    # running handle count
 
@@ -223,6 +226,24 @@ class Schedule(object):
                 elif isinstance(item, TaskItem):
                     yield item
 
+    def get_curl_pool(self):
+        if len(self.curl_pool):
+            return self.curl_pool.popleft()
+        else:
+            return pycurl.Curl()
+
+    def put_curl_pool(self, c):
+        if hasattr(c, "in_pool") and c.in_pool == 1:
+            self.session.init_curl_var(c)
+            if hasattr(c, "spider_request"): c.spider_request = None
+            if hasattr(c, "meta"): c.meta = None
+            if hasattr(c, "top_domain"): c.top_domain = None
+            if hasattr(c, "spider_id"): c.spider_id = None
+            if len(self.curl_pool) > self.curl_pool_max:
+                c.close()
+            else:
+                self.curl_pool.append(c)
+
     def make_curl_handle(self, request, spider):
         url = request.url
         url_parsed = urlparse(url)
@@ -244,9 +265,14 @@ class Schedule(object):
         if "cookiejar" in request.meta:
             args["session_id"] = request.meta["cookiejar"]
             self.set_multi_cookiejar(request.meta["cookiejar"])
-        if "c" in args and not isinstance(args["c"], pycurl.Curl):
+        if "c" in args and isinstance(args["c"], pycurl.Curl):
+            c = args["c"]
+            c.in_pool = 0
             args.pop("c")
-        c = self.session.prepare_curl_handle(url=url, **args)
+        else:
+            c = self.get_curl_pool()
+            c.in_pool = 1
+        c = self.session.prepare_curl_handle(url=url, c=c, **args)
         c.meta = request.meta
         c.top_domain = top_domain
         c.spider_id = spider.spider_id
@@ -255,27 +281,47 @@ class Schedule(object):
         return c
 
     def run_request_callback(self, request, response, spider):
-        ret = request._run_callback(response)
-        new_request = None
+        spider_id = spider.spider_id
         try:
-            if isgenerator(ret):
-                new_request = next(ret)
-                if isinstance(new_request, Request):
-                    args = new_request.args
-                    if "headers" not in args:
-                        new_request.args.update({"headers": {}})
-                    if "referer" not in new_request.args['headers']:
-                        new_request.args['headers'].update({
-                            "referer": response.request["url"]
-                        })
-                if isinstance(new_request, dict):
-                    self.run_pipeline(new_request, spider)
-        except StopIteration:
-            pass
-        except CloseSpider as reason:
-            self.manual_close_task(spider, reason)
-        finally:
-            return ret, new_request
+            item = request._run_callback(response)
+        except Exception as e:
+            spider._get_logger().exception(e)
+            return True
+        if isgenerator(item):
+            while True:
+                try:
+                    # get next request and stop or raise
+                    result = next(item)
+                    if isinstance(result, dict):
+                        self.run_pipeline(result, spider)
+                        continue
+                    if isinstance(result, Request):
+                        if "headers" not in result.args:
+                            result.args.update({"headers": {}})
+                        if "referer" not in result.args['headers']:
+                            result.args['headers'].update({
+                                "referer": response.request["url"]
+                            })
+                        self.queue_pending.append(TaskItem(spider_id, result))
+                        self.queue_pending.append(TaskItem(spider_id, item))
+                        break
+                    # other, ignore
+                    continue
+                except StopIteration:
+                    break
+                except CloseSpider as reason:
+                    self.manual_close_task(spider, reason)
+                except Exception as e:
+                    self.logger.exception(e)
+                break
+        return True
+
+    def add_curl_handle(self, c):
+        self.cm.add_handle(c)
+        self.num_handles += 1
+        if c not in self.curl_handles[c.top_domain]["handles"]:
+            self.curl_handles[c.top_domain]["handles"].append(c)
+            self.curl_handles[c.top_domain]["last"] = time.time()
 
     def collect_curl_multi(self):
         if len(self.queue_pending) == 0:
@@ -288,27 +334,35 @@ class Schedule(object):
                 pass
         self.queue_delay.clear()
         while len(self.queue_pending) > 0:
-            if self.num_handles >= self.settings["CONCURRENT_REQUESTS"]:
+            count = self.settings["CONCURRENT_REQUESTS"] - self.num_handles
+            if count <= 0:
                 break
             queue_item = self.queue_pending.popleft()
             spider_id, item = queue_item.spider_id, queue_item.item
             spider = self.spider_instance[spider_id]
             if isgenerator(item):
                 # ========== process isgenerator start ==========
-                try:
-                    result = next(item)
-                    if isinstance(result, Request):
-                        self.queue_pending.append(TaskItem(spider_id, result))
-                    self.queue_delay.append(TaskItem(spider_id, item))
-                    if isinstance(result, dict):
-                        self.run_pipeline(result, spider)
-                except StopIteration:
-                    continue
-                except CloseSpider as reason:
-                    self.manual_close_task(spider, reason)
-                except Exception as e:
-                    self.logger.exception(e)
-                    continue
+                while True:
+                    try:
+                        # get next request and stop or raise
+                        result = next(item)
+                        if isinstance(result, dict):
+                            self.run_pipeline(result, spider)
+                            continue
+                        if isinstance(result, Request):
+                            self.queue_pending.append(TaskItem(spider_id, result))
+                            self.queue_pending.append(TaskItem(spider_id, item))
+                            break
+                        # other, ignore
+                        continue
+                    except StopIteration:
+                        del queue_item
+                        break
+                    except CloseSpider as reason:
+                        self.manual_close_task(spider, reason)
+                    except Exception as e:
+                        self.logger.exception(e)
+                    break
                 # ========== process isgenerator end ==========
             elif isinstance(item, Request):
                 # ========== process request start ==========
@@ -363,26 +417,21 @@ class Schedule(object):
                                     get_new_queue_item = True
                                     break
                                 if isinstance(ret, Response):
-                                    ret, new_request = self.run_request_callback(c.spider_request, ret, spider)
-                                    if ret:
-                                        self.queue_delay.append(TaskItem(spider_id, ret))
-                                    if new_request:
-                                        self.queue_delay.append(TaskItem(spider_id, new_request))
+                                    self.run_request_callback(c.spider_request, ret, spider)
                                     get_new_queue_item = True
                                     break
                             except IgnoreRequest:
                                 get_new_queue_item = True
-                                del queue_item
                                 break
                             except Exception as e:
                                 spider._get_logger().exception(e)
 
-                    if get_new_queue_item: continue
+                    if get_new_queue_item:
+                        del queue_item
+                        self.put_curl_pool(c)
+                        continue
                     # ========== Middleware end ==========
-                    self.cm.add_handle(c)
-                    self.curl_handles[c.top_domain]["handles"].append(c)
-                    self.curl_handles[c.top_domain]["last"] = time.time()
-                    self.num_handles += 1
+                    self.add_curl_handle(c)
                     del queue_item
                 else:
                     self.queue_delay.append(queue_item)
@@ -419,11 +468,8 @@ class Schedule(object):
             )
         ):
             self.session._response_redirect(c, logger_handle=self.logger)
-            self.cm.add_handle(c)
-            self.curl_handles[c.top_domain]["handles"].append(c)
-            self.curl_handles[c.top_domain]["last"] = time.time()
-            self.num_handles += 1
-            return
+            self.add_curl_handle(c)
+            return False
         self.logger.info(
             "({0}) <{1} {2} {3}s> (referer: {4})".format(
                 response.status_code,
@@ -434,36 +480,22 @@ class Schedule(object):
             )
         )
         if response.status_code in self.session.retry_http_codes:
-            c = self.session._response_retry(
+            self.session._response_retry(
                 c,
                 max_time=self.settings["RETRY_TIMES"],
                 logger_handle=self.logger,
             )
             if c.retry < self.settings["RETRY_TIMES"]:
-                self.cm.add_handle(c)
-                self.curl_handles[c.top_domain]["handles"].append(c)
-                self.curl_handles[c.top_domain]["last"] = time.time()
-                self.num_handles += 1
+                self.add_curl_handle(c)
+                return False
             else:
                 self.session._response_retry(
                     c,
                     max_time=self.settings["RETRY_TIMES"],
                     logger_handle=self.logger,
                 )
-                c.close()
-            return
-        try:
-            ret, new_request = self.run_request_callback(c.spider_request, response, spider)
-            if ret:
-                self.queue_pending.append(TaskItem(spider_id, ret))
-            if new_request:
-                self.queue_pending.append(TaskItem(spider_id, new_request))
-        except CloseSpider as reason:
-            self.manual_close_task(spider, reason)
-        except Exception as e:
-            spider._get_logger().exception(e)
-        c.close()
-        return
+                return True
+        return self.run_request_callback(c.spider_request, response, spider)
 
     def process_curl_multi_ok(self, c):
         spider_id = c.spider_id
@@ -504,11 +536,17 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
         if get_new_queue_item:
-            c.close()
+            response.content = None
+            del response
+            self.put_curl_pool(c)
             return
         # ========== Middleware end ==========
         # ========== process_response start ==========
-        self.process_response(response, c)
+        # self.process_response(response, c)
+        if self.process_response(response, c):
+            response.content = None
+            del response
+            self.put_curl_pool(c)
         # ========== process_response end ==========
 
     def process_curl_multi_err(self, c, errno, errmsg):
@@ -518,6 +556,7 @@ class Schedule(object):
         self.cm.remove_handle(c)
         self.curl_handles[c.top_domain]["handles"].remove(c)
         # ========== Middleware start ==========
+        free_c = True
         get_new_queue_item = False
         for m_index in range(len(self.middleware), 0, -1):
             middleware = self.middleware[m_index - 1]
@@ -540,10 +579,8 @@ class Schedule(object):
                 except RetryRequest:
                     c.retry += 1
                     if c.retry < self.settings["RETRY_TIMES"]:
-                        self.cm.add_handle(c)
-                        self.curl_handles[c.top_domain]["handles"].append(c)
-                        self.curl_handles[c.top_domain]["last"] = time.time()
-                        self.num_handles += 1
+                        self.add_curl_handle(c)
+                        free_c = False
                         # middleware control log
                     else:
                         msg = "Failed to process <{0} {1}>, try max time.".format(
@@ -554,9 +591,11 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
         if get_new_queue_item:
-            c.close()
+            self.put_curl_pool(c)
             return
         # ========== Middleware end ==========
+        if free_c:
+            self.put_curl_pool(c)
 
     def manual_close_task(self, spider, reason=None):
         spider_id = spider.spider_id
@@ -609,6 +648,7 @@ class Schedule(object):
         self.logger.info("Spider started")
         # ========== schedule info end ==========
         # ========== main loop start ==========
+        gc_time = time.time()
         loop_init = True
         to_update_cm = True
         running_handles = 0
@@ -617,7 +657,7 @@ class Schedule(object):
             try:
                 while 1:
                     ret, self.num_handles = self.cm.perform()
-                    if ret != pycurl.E_CALL_MULTI_PERFORM:
+                    if ret != pycurl.E_CALL_MULTI_PERFORM or self.num_handles == 0:
                         break
                 self.cm.select(0.001)
                 if running_handles != self.num_handles:
@@ -628,15 +668,29 @@ class Schedule(object):
 
                     for c, errno, errmsg in err_list:
                         self.process_curl_multi_err(c, errno, errmsg)
-                    if to_update_cm:
-                        self.collect_curl_multi()
 
-                if self.num_handles == 0 and to_update_cm:
+                    if time.time() - gc_time > 60:
+                        gc_time = time.time()
+                        gc.collect()
+
+                # when to add new curl?
+                if (to_update_cm
+                    and running_handles <= self.settings["CONCURRENT_REQUESTS"]
+                    # and len(self.queue_pending) <= self.settings["CONCURRENT_REQUESTS"]
+                ):
                     self.collect_curl_multi()
+                # when Ctrl+c, wait for running_handles to be 0
+                if to_update_cm == False and running_handles == 0:
+                    break
             except KeyboardInterrupt:
                 if to_update_cm == True:
                     to_update_cm = False
-                    self.logger.info("KeyboardInterrupt raised. No more new request will be added to queue. You can send CTRL-c again to shut down schedule.")
+                    self.logger.info(
+                        "KeyboardInterrupt raised."
+                        "No more new request will be added to queue."
+                        "You can send CTRL-c again to shut down schedule."
+                        "Or wait for request done."
+                    )
                     continue
                 else:
                     for spider_id, _ in self.spider_instance.items():
