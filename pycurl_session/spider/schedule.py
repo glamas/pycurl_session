@@ -64,6 +64,8 @@ class Schedule(object):
         self.set_middleware()
         self.set_pipeline()
 
+        self.response_ref = {}
+
     def update_settings(self, custom_settings):
         for item in dir(settings):
             if item.isupper():
@@ -291,6 +293,8 @@ class Schedule(object):
             while True:
                 try:
                     # get next request and stop or raise
+                    if id(item) not in self.response_ref:
+                        self.response_ref.update({id(item): response})
                     result = next(item)
                     if isinstance(result, dict):
                         self.run_pipeline(result, spider)
@@ -308,6 +312,8 @@ class Schedule(object):
                     # other, ignore
                     continue
                 except StopIteration:
+                    if id(item) in self.response_ref:
+                        self.response_ref.pop(id(item))
                     break
                 except CloseSpider as reason:
                     self.manual_close_task(spider, reason)
@@ -350,12 +356,21 @@ class Schedule(object):
                             self.run_pipeline(result, spider)
                             continue
                         if isinstance(result, Request):
+                            if id(item) in self.response_ref:
+                                if "headers" not in result.args:
+                                    result.args.update({"headers": {}})
+                                if "referer" not in result.args['headers']:
+                                    result.args['headers'].update({
+                                        "referer": self.response_ref[id(item)].request["url"]
+                                    })
                             self.queue_pending.append(TaskItem(spider_id, result))
                             self.queue_pending.append(TaskItem(spider_id, item))
                             break
                         # other, ignore
                         continue
                     except StopIteration:
+                        if id(item) in self.response_ref:
+                            self.response_ref.pop(id(item))
                         del queue_item
                         break
                     except CloseSpider as reason:
