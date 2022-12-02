@@ -534,10 +534,10 @@ class Session(object):
         else:
             # put, patch, and other method
             c.setopt(pycurl.CUSTOMREQUEST, origin_method.upper())
-        c.header_handle.clear()
-        c.response_headers.clear()
         c.buffer.seek(0)
         c.buffer.truncate()
+        c.header_handle.clear()
+        c.response_headers.clear()
 
         if logger_handle:
             status_code = c.getinfo(pycurl.RESPONSE_CODE)
@@ -552,8 +552,6 @@ class Session(object):
                     c.request["referer"],
                 )
             )
-
-        # c = self.prepare_curl_handle("GET", url, c, headers={"referer": origin_url}, proxy=c.proxy)
 
     def _response_retry(self, c, max_time=3, logger_handle=None):
         c.retry += 1
