@@ -507,7 +507,6 @@ class Session(object):
     def _response_redirect(self, c, logger_handle=None):
         origin_url = c.request["url"]
         origin_method = c.request["method"]
-        origin_url = origin_url.split("?", 1)[0]
 
         for header in c.response_headers:
             if "location:" in header.lower():
