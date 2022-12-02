@@ -717,6 +717,14 @@ class Schedule(object):
         # all spider done, spider call closed() and item pipeline call close_spider()
         self.process_close_call()
 
+        # some clean work. may be usefull
+        self.queue_pending.clear()
+        self.queue_delay.clear()
+        self.curl_pool.clear()
+        self.curl_handles.clear()
+        self.response_ref.clear()   # important
+        self.cm.close()
+
         # ========== logstat start ==========
         if self.settings["ROBOTSTXT_OBEY"]:
             self.logstat.update(self.robotstxt.process_logstat())
