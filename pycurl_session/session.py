@@ -62,6 +62,7 @@ class Session(object):
         self._retry_interval = 5
         self._backoff = [self._retry_interval]
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
+        self.redirect_http_codes = [301, 302, 307, 308]
         self._timeout = 30
 
         self._fh = None
@@ -129,7 +130,7 @@ class Session(object):
                 c.perform()
                 response = self.gather_response(c)
                 perform_time = c.getinfo(pycurl.TOTAL_TIME)
-                if response.status_code in [301, 302, 307] and c.allow_redirects:
+                if response.status_code in self.redirect_http_codes and c.allow_redirects:
                     self._response_redirect(c, logger_handle=logger)
                     continue
                 logger.info(
