@@ -522,15 +522,28 @@ class Session(object):
 
                 c.request.update({"url": url})
                 c.setopt(pycurl.URL, url)
-                c.setopt(pycurl.HTTPGET, 1)
-                c.setopt(pycurl.REFERER, origin_url)
                 break
+        # update curl
+        c.setopt(pycurl.REFERER, origin_url)
+        if origin_method.lower() == "post":
+            c.setopt(pycurl.POST, 1)
+        elif origin_method.lower() == "get":
+            c.setopt(pycurl.HTTPGET, 1)
+        elif origin_method.lower() == "head":
+            c.setopt(pycurl.NOBODY, 1)
+        else:
+            # put, patch, and other method
+            c.setopt(pycurl.CUSTOMREQUEST, origin_method.upper())
+        c.header_handle.clear()
+        c.response_headers.clear()
+        c.buffer.seek(0)
+        c.buffer.truncate()
 
         if logger_handle:
             status_code = c.getinfo(pycurl.RESPONSE_CODE)
             perform_time = c.getinfo(pycurl.TOTAL_TIME)
             logger_handle.info(
-                "({0}) to <GET {1}> from <{2} {3} {4}s> (referer: {5})".format(
+                "({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})".format(
                     status_code,
                     c.request["url"],
                     origin_method,
@@ -540,7 +553,7 @@ class Session(object):
                 )
             )
 
-        c = self.prepare_curl_handle("GET", url, c, headers={"referer": origin_url}, proxy=c.proxy)
+        # c = self.prepare_curl_handle("GET", url, c, headers={"referer": origin_url}, proxy=c.proxy)
 
     def _response_retry(self, c, max_time=3, logger_handle=None):
         c.retry += 1

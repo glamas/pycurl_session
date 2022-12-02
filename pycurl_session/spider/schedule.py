@@ -472,7 +472,7 @@ class Schedule(object):
         spider_id = c.spider_id
         spider = self.spider_instance[spider_id]
         perform_time = c.getinfo(pycurl.TOTAL_TIME)
-        if response.status_code in [301, 302] and (
+        if response.status_code in self.session.redirect_http_codes and (
             (
                 "dont_redirect" not in response.meta
                 and self.settings["REDIRECT_ENABLED"] == True
