@@ -189,7 +189,11 @@ class Selector(object):
         return default
 
     def getall(self):
-        return [sel.get() for sel in self.lst] if len(self.lst) > 0 else [self.get()]
+        if len(self.lst) > 0:
+            return [sel.get() for sel in self.lst]
+        else:
+            ele = self.get()
+            return [ele] if ele else []
 
     def extract_first(self, default):
         return self.get(default=default)

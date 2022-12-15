@@ -16,11 +16,24 @@ class ResponseTestCase(unittest.TestCase):
         self.session = Session()
         self.session.headers.update(headers)
 
-    def test_selector(self):
+    def test_selector_text(self):
         html = "<html><p>hello</p><p>world</p></html>"
         sel = Selector(text=html)
         result = sel.xpath("//p/text()").getall()
         self.assertEqual(result, ["hello", "world"])
+
+    def test_selector_ele(self):
+        html = "<html><p>hello</p><p>world</p></html>"
+        sel = Selector(text=html)
+        result = sel.xpath("//p").getall()
+        self.assertEqual(len(result), 2)
+        self.assertNotIsInstance(result[0], str)
+
+    def test_selector_empty(self):
+        html = "<html><p>hello</p><p>world</p></html>"
+        sel = Selector(text=html)
+        result = sel.xpath("//div/a").getall()
+        self.assertEqual(result, [])
 
     def test_response_json(self):
         url = "https://httpbin.org/get"
