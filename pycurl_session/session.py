@@ -433,6 +433,7 @@ class Session(object):
         c.setopt(pycurl.MAXREDIRS, 5)
         c.setopt(pycurl.ENCODING, "")
         # c.setopt(pycurl.ENCODING, "gzip,deflate")
+        # c.setopt(pycurl.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
 
         c.setopt(pycurl.HEADERFUNCTION, c.header_handle.write)
         c.setopt(pycurl.WRITEDATA, c.buffer)
@@ -515,13 +516,15 @@ class Session(object):
                 url = urljoin(origin_url, url)
                 if " " in url:
                     url = url.replace(" ", "%20")
-                url_info = urlparse(url)
-                scheme = url_info.scheme
-                if scheme.lower() == "https":
-                    self._set_ssl(c)
-
                 c.request.update({"url": url})
                 c.setopt(pycurl.URL, url)
+
+                url_info = urlparse(url)
+                if url_info.scheme.lower() == "https":
+                    self._set_ssl(c)
+                c.request["headers"].update({"host": url_info.hostname})
+                headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in c.request["headers"].items()]
+                c.setopt(pycurl.HTTPHEADER, headers_list)
                 break
         # update curl
         c.setopt(pycurl.REFERER, origin_url)
