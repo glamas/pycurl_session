@@ -64,6 +64,7 @@ CREATE TABLE cookie (
             else:
                 cursor.executemany(sql)
             self.conn.commit()
+            cursor.close()
         except sqlite3.Error:
             traceback.print_exc()
         finally:

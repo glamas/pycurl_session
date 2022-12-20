@@ -254,7 +254,7 @@ class Session(object):
             query = "&".join(_tmp)
         if query: url = url.split("?")[0] + "?" + query
         c.request.update({"url": url})
-        c.setopt(pycurl.URL, url)
+        c.setopt(c.URL, url)
 
         request_headers = self._prepare_request_headers(c, headers, url)
         self._set_proxy(c, proxy)
@@ -302,7 +302,7 @@ class Session(object):
         #   params accept dict or raw_str
         c.request.update({"method": method.upper()})
         if method.lower() == "post":
-            c.setopt(pycurl.POST, 1)
+            c.setopt(c.POST, 1)
             if multipart or files is not None:
                 # Multipart/form-data
                 post_data = []
@@ -347,7 +347,7 @@ class Session(object):
                     else:
                         logger.error("params[files] need like {'field':path_to_file}")
                 if post_data:
-                    c.setopt(pycurl.HTTPPOST, post_data)
+                    c.setopt(c.HTTPPOST, post_data)
             elif data is None and files is None and json_data is not None:
                 # application/json
                 if (
@@ -373,70 +373,70 @@ class Session(object):
                 json_body = (
                     json.dumps(json_data) if isinstance(json_data, dict) else json_data
                 )
-                c.setopt(pycurl.POSTFIELDS, json_body)
+                c.setopt(c.POSTFIELDS, json_body)
             elif data is not None:
                 # application/x-www-form-urlencoded
                 if "content-type" not in request_headers:
                     request_headers.update({"content-type": "application/x-www-form-urlencoded"})
                 post_data = urlencode(data) if isinstance(data, dict) else data
-                c.setopt(pycurl.POSTFIELDS, post_data)
+                c.setopt(c.POSTFIELDS, post_data)
             else:
-                c.setopt(pycurl.POSTFIELDS, "")
+                c.setopt(c.POSTFIELDS, "")
         elif method.lower() == "put" or method.lower() == "patch":
             # application/json
             if "content-type" not in request_headers:
                 request_headers.update({"content-type": "application/json"})
             if method.lower() == "patch":
-                c.setopt(pycurl.CUSTOMREQUEST, "PATCH")
+                c.setopt(c.CUSTOMREQUEST, "PATCH")
             if method.lower() == "put":
-                c.setopt(pycurl.CUSTOMREQUEST, "PUT")
+                c.setopt(c.CUSTOMREQUEST, "PUT")
             # files > json_data > data, only one will use
             if files is not None and isinstance(files, str):
                 with open(files) as f:
                     data_body = f.read()
-                c.setopt(pycurl.POSTFIELDS, data_body)
+                c.setopt(c.POSTFIELDS, data_body)
             elif json_data is not None:
                 data_body = (
                     json.dumps(json_data) if isinstance(json_data, dict) else json_data
                 )
-                c.setopt(pycurl.POSTFIELDS, data_body)
+                c.setopt(c.POSTFIELDS, data_body)
             else:
                 data_body = json.dumps(data) if isinstance(data, dict) else data
-                c.setopt(pycurl.POSTFIELDS, data_body)
+                c.setopt(c.POSTFIELDS, data_body)
         elif method.lower() == "get":
-            c.setopt(pycurl.HTTPGET, 1)
+            c.setopt(c.HTTPGET, 1)
         elif method.lower() == "head":
-            c.setopt(pycurl.NOBODY, 1)
+            c.setopt(c.NOBODY, 1)
         else:
-            c.setopt(pycurl.CUSTOMREQUEST, method.upper())
+            c.setopt(c.CUSTOMREQUEST, method.upper())
 
         c.request.update({"headers": request_headers})
         headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
-        c.setopt(pycurl.HTTPHEADER, headers_list)
+        c.setopt(c.HTTPHEADER, headers_list)
 
         # if len(self.history) > 0 and request_referer == None:
         #     request_referer = self.history[-1]
-        #     c.setopt(pycurl.REFERER, self.history[-1])
+        #     c.setopt(c.REFERER, self.history[-1])
         # if request_referer:
-        #     c.setopt(pycurl.REFERER, request_referer)
+        #     c.setopt(c.REFERER, request_referer)
         # c.request.update({"referer": request_referer})
 
         c.allow_redirects = allow_redirects
-        c.setopt(pycurl.FOLLOWLOCATION, 0)
+        c.setopt(c.FOLLOWLOCATION, 0)
 
         if not timeout:
             timeout = self._timeout
-        c.setopt(pycurl.CONNECTTIMEOUT, timeout)
-        c.setopt(pycurl.TIMEOUT, timeout)
+        c.setopt(c.CONNECTTIMEOUT, timeout)
+        c.setopt(c.TIMEOUT, timeout)
 
-        # c.setopt(pycurl.HEADER,1)    # write header + body
-        c.setopt(pycurl.MAXREDIRS, 5)
-        c.setopt(pycurl.ENCODING, "")
-        # c.setopt(pycurl.ENCODING, "gzip,deflate")
-        # c.setopt(pycurl.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
+        # c.setopt(c.HEADER,1)    # write header + body
+        c.setopt(c.MAXREDIRS, 5)
+        c.setopt(c.ENCODING, "")
+        # c.setopt(c.ENCODING, "gzip,deflate")
+        # c.setopt(c.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
 
-        c.setopt(pycurl.HEADERFUNCTION, c.header_handle.write)
-        c.setopt(pycurl.WRITEDATA, c.buffer)
+        c.setopt(c.HEADERFUNCTION, c.header_handle.write)
+        c.setopt(c.WRITEDATA, c.buffer)
         return c
 
     def gather_response(self, c):
@@ -459,17 +459,17 @@ class Session(object):
 
     def _set_ssl(self, c):
         if c.cert:
-            c.setopt(pycurl.CAINFO, c.cert)
+            c.setopt(c.CAINFO, c.cert)
         else:
-            c.setopt(pycurl.CAINFO, certifi.where())
+            c.setopt(c.CAINFO, certifi.where())
         if c.verify and self._verify:
-            c.setopt(pycurl.SSL_VERIFYPEER, 1)
-            c.setopt(pycurl.SSL_VERIFYHOST, 2)
+            c.setopt(c.SSL_VERIFYPEER, 1)
+            c.setopt(c.SSL_VERIFYHOST, 2)
         else:
-            c.setopt(pycurl.SSL_VERIFYPEER, 0)
-            c.setopt(pycurl.SSL_VERIFYHOST, 0)
+            c.setopt(c.SSL_VERIFYPEER, 0)
+            c.setopt(c.SSL_VERIFYHOST, 0)
         if self._ssl_cipher_list:
-            c.setopt(pycurl.SSL_CIPHER_LIST, self._ssl_cipher_list)
+            c.setopt(c.SSL_CIPHER_LIST, self._ssl_cipher_list)
 
 
     def _prepare_request_headers(self, c, headers, url):
@@ -487,7 +487,7 @@ class Session(object):
                 if k.lower() == "referer":
                     request_referer = v
                 # if k.lower() == "user-agent":
-                #     c.setopt(pycurl.USERAGENT,v)
+                #     c.setopt(c.USERAGENT,v)
                 #     self.useragent = v
         elif headers and isinstance(headers, list):
             for s in headers:
@@ -497,10 +497,10 @@ class Session(object):
                     if t[0].lower() == "referer":
                         request_referer = t[1]
                     # if t[0].lower() == "user-agent":
-                    #     c.setopt(pycurl.USERAGENT,t[1])
+                    #     c.setopt(c.USERAGENT,t[1])
                     #     self.useragent = v
         if request_referer != "" and request_referer is not None:
-            c.setopt(pycurl.REFERER, request_referer)
+            c.setopt(c.REFERER, request_referer)
             c.request.update({"referer": request_referer})
         else:
             c.request.update({"referer": None})
@@ -517,26 +517,26 @@ class Session(object):
                 if " " in url:
                     url = url.replace(" ", "%20")
                 c.request.update({"url": url})
-                c.setopt(pycurl.URL, url)
+                c.setopt(c.URL, url)
 
                 url_info = urlparse(url)
                 if url_info.scheme.lower() == "https":
                     self._set_ssl(c)
                 c.request["headers"].update({"host": url_info.hostname})
                 headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in c.request["headers"].items()]
-                c.setopt(pycurl.HTTPHEADER, headers_list)
+                c.setopt(c.HTTPHEADER, headers_list)
                 break
         # update curl
-        c.setopt(pycurl.REFERER, origin_url)
+        c.setopt(c.REFERER, origin_url)
         if origin_method.lower() == "post":
-            c.setopt(pycurl.POST, 1)
+            c.setopt(c.POST, 1)
         elif origin_method.lower() == "get":
-            c.setopt(pycurl.HTTPGET, 1)
+            c.setopt(c.HTTPGET, 1)
         elif origin_method.lower() == "head":
-            c.setopt(pycurl.NOBODY, 1)
+            c.setopt(c.NOBODY, 1)
         else:
             # put, patch, and other method
-            c.setopt(pycurl.CUSTOMREQUEST, origin_method.upper())
+            c.setopt(c.CUSTOMREQUEST, origin_method.upper())
         c.buffer.seek(0)
         c.buffer.truncate()
         c.header_handle.clear()
@@ -625,23 +625,23 @@ class Session(object):
         else:
             proxy_info = self.proxy
         if proxy_info:
-            c.setopt(pycurl.IPRESOLVE, pycurl.IPRESOLVE_V4)
-            c.setopt(pycurl.PROXY, proxy_info["hostname"])
+            c.setopt(c.IPRESOLVE, pycurl.IPRESOLVE_V4)
+            c.setopt(c.PROXY, proxy_info["hostname"])
             if proxy_info.get("scheme"):
                 if proxy_info["scheme"].lower() == "socks5":
-                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5)
+                    c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5)
                 if proxy_info["scheme"].lower() == "socks5h":
-                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5_HOSTNAME)
+                    c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_SOCKS5_HOSTNAME)
                 elif proxy_info["scheme"].lower() == "socks4":
-                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4)
+                    c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4)
                 elif proxy_info["scheme"].lower() == "socks4a":
-                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4A)
+                    c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_SOCKS4A)
                 # elif proxy_info["scheme"].lower() == "https":         # Added in 7.52.0 for OpenSSL, GnuTLS and NSS
-                #     c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_HTTPS)
+                #     c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_HTTPS)
                 else:
-                    c.setopt(pycurl.PROXYTYPE, pycurl.PROXYTYPE_HTTP)
+                    c.setopt(c.PROXYTYPE, pycurl.PROXYTYPE_HTTP)
             if proxy_info.get("port"):
-                c.setopt(pycurl.PROXYPORT, proxy_info["port"])
+                c.setopt(c.PROXYPORT, proxy_info["port"])
             if proxy_info.get("username") and proxy_info.get("password"):
                 c.setopt(
                     pycurl.PROXYUSERPWD,
@@ -650,9 +650,9 @@ class Session(object):
 
     def _set_verbose(self, c, verbose):
         if verbose:
-            c.setopt(pycurl.VERBOSE, 1)
+            c.setopt(c.VERBOSE, 1)
         else:
-            c.setopt(pycurl.VERBOSE, 0)
+            c.setopt(c.VERBOSE, 0)
 
     def _response_decode(self, response):
         content_type = ""
