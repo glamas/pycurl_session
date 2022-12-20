@@ -246,6 +246,18 @@ class Schedule(object):
             else:
                 self.curl_pool.append(c)
 
+    def get_pending_taskitem(self):
+        return self.queue_pending.popleft()
+
+    def put_pending_taskitem(self, taskitem):
+        if self.settings["DEPTH_PRIORITY"]:
+            self.queue_pending.appendleft(taskitem)
+        else:
+            self.queue_pending.append(taskitem)
+        # debug
+        if isinstance(taskitem.item, Request):
+            self.logger.info("put_pending_taskitem: " + taskitem.item.url)
+
     def make_curl_handle(self, request, spider):
         url = request.url
         url_parsed = urlparse(url)
@@ -306,8 +318,8 @@ class Schedule(object):
                             result.args['headers'].update({
                                 "referer": response.request["url"]
                             })
-                        self.queue_pending.append(TaskItem(spider_id, result))
-                        self.queue_pending.append(TaskItem(spider_id, item))
+                        self.put_pending_taskitem(TaskItem(spider_id, result))
+                        self.put_pending_taskitem(TaskItem(spider_id, item))
                         break
                     # other, ignore
                     continue
@@ -335,9 +347,10 @@ class Schedule(object):
             try:
                 queue_item = next(self.get_queue_item())
                 if queue_item:
-                    self.queue_pending.append(queue_item)
+                    self.put_pending_taskitem(queue_item)
             except StopIteration:
                 pass
+        # queue_delay, first in first out.
         self.queue_delay.clear()
         while len(self.queue_pending) > 0:
             count = self.settings["CONCURRENT_REQUESTS"] - self.num_handles
@@ -363,8 +376,8 @@ class Schedule(object):
                                     result.args['headers'].update({
                                         "referer": self.response_ref[id(item)].request["url"]
                                     })
-                            self.queue_pending.append(TaskItem(spider_id, result))
-                            self.queue_pending.append(TaskItem(spider_id, item))
+                            self.put_pending_taskitem(TaskItem(spider_id, item))
+                            self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
                         # other, ignore
                         continue
@@ -395,11 +408,16 @@ class Schedule(object):
                     )
                 # ========== RobotsTxt start ==========
                 if self.settings["ROBOTSTXT_OBEY"]:
+                    # RobotsTxt.process_request:
+                    #   Request: put back queue_item, and put robotstxt request item
+                    #   Response: downloading, put back queue_item
+                    #   None: check url pass, continue
+                    # Or raise IgnoreRequest: check url failed, drop queue_item
                     try:
                         ret = self.robotstxt.process_request(item, spider)
                         if isinstance(ret, Request):
-                            self.queue_delay.append(TaskItem(spider_id, item))
                             self.queue_delay.append(TaskItem(spider_id, ret))
+                            self.queue_delay.append(TaskItem(spider_id, item))
                             continue
                         if isinstance(ret, Response):
                             self.queue_delay.append(TaskItem(spider_id, item))
@@ -460,13 +478,13 @@ class Schedule(object):
                 try:
                     queue_item = next(self.get_queue_item())
                     if queue_item:
-                        self.queue_pending.append(queue_item)
+                        self.put_pending_taskitem(queue_item)
                 except StopIteration:
                     pass
 
         # put back to queue_pending
         while len(self.queue_delay) > 0:
-            self.queue_pending.appendleft(self.queue_delay.pop())
+            self.queue_pending.appendleft(self.queue_delay.popleft())
 
     def process_response(self, response, c):
         spider_id = c.spider_id
@@ -539,7 +557,7 @@ class Schedule(object):
                     ret = middleware.process_response(c.spider_request, response, spider)
                     if ret is None: continue
                     if isinstance(ret, Request):
-                        self.queue_pending.append(TaskItem(spider_id, ret))
+                        self.put_pending_taskitem(TaskItem(spider_id, ret))
                         get_new_queue_item = True
                         break
                     if isinstance(ret, Response):
@@ -585,7 +603,7 @@ class Schedule(object):
                     ret = middleware.process_exception(c.spider_request, PerformError(errno, errmsg), spider)
                     if ret is None: continue
                     if isinstance(ret, Request):
-                        self.queue_pending.append(TaskItem(spider_id, ret))
+                        self.put_pending_taskitem(TaskItem(spider_id, ret))
                         get_new_queue_item = True
                         break
                     if isinstance(ret, Response):

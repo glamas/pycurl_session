@@ -44,3 +44,6 @@ LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 
 ## thread
 CONCURRENT_REQUESTS = 16
+
+# DFO or BFO
+DEPTH_PRIORITY = 1
