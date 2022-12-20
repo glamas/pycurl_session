@@ -254,9 +254,6 @@ class Schedule(object):
             self.queue_pending.appendleft(taskitem)
         else:
             self.queue_pending.append(taskitem)
-        # debug
-        if isinstance(taskitem.item, Request):
-            self.logger.info("put_pending_taskitem: " + taskitem.item.url)
 
     def make_curl_handle(self, request, spider):
         url = request.url
