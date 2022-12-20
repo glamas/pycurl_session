@@ -62,7 +62,7 @@ class FormRequest(Request):
             else:
                 action = action + "?" + query
             _form_data = None
-        yield Request(
+        return Request(
             url=action,
             method=method,
             data=_form_data,
