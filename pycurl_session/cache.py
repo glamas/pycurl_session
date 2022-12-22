@@ -41,34 +41,31 @@ CREATE TABLE cookie (
         if self.conn:
             self.conn.close()
 
-    def execute(self, sql, para=None):
-        res = None
+    def _query(self, sql, para=None, batch=False):
         try:
             cursor = self.conn.cursor()  # use new cursor
-            if para:
-                res = cursor.execute(sql, para)
+            if batch:
+                if para:
+                    cursor.executemany(sql, para)
+                else:
+                    cursor.executemany(sql)
             else:
-                res = cursor.execute(sql)
-            # cursor.close()
+                if para:
+                    cursor.execute(sql, para)
+                else:
+                    cursor.execute(sql)
+            self.conn.commit()
+            return cursor
         except sqlite3.Error:
             traceback.print_exc()
-        finally:
-            return res
+        return None
+
+
+    def execute(self, sql, para=None):
+        return self._query(sql, para)
 
     def executemany(self, sql, para=None):
-        res = None
-        try:
-            cursor = self.conn.cursor()
-            if para:
-                cursor.executemany(sql, para)
-            else:
-                cursor.executemany(sql)
-            self.conn.commit()
-            cursor.close()
-        except sqlite3.Error:
-            traceback.print_exc()
-        finally:
-            return res
+        return self._query(sql, para, batch=True)
 
     query = execute
 
@@ -100,7 +97,8 @@ CREATE TABLE cookie (
                 path = "/"
                 expires = ""
                 params.append((session_id, name, value, domain, path, expires))
-            self.executemany(sql, params)
+            res = self.executemany(sql, params)
+            if res: res.close()
 
         sql = (
             "SELECT name, value, domain, path, expires FROM cookie"
@@ -114,6 +112,7 @@ CREATE TABLE cookie (
             path = item[3]
             if url_path.startswith(path):
                 cookies.update({item[0]: item[1]})
+        if res: res.close()
         return cookies
 
     def save_cookies(self, params):
@@ -121,18 +120,21 @@ CREATE TABLE cookie (
             "INSERT OR REPLACE INTO cookie (session_id, name, value, domain, path, expires)"
             "VALUES(?, ?, ?, ?, ?, ?)"
         )
-        self.executemany(sql, params)
+        res = self.executemany(sql, params)
+        if res: res.close()
 
     def delete_cookies(self, params):
         sql = (
             "DELETE FROM cookie WHERE session_id=? and name=? and domain=? and path=?"
         )
-        self.executemany(sql, params)
+        res = self.executemany(sql, params)
+        if res: res.close()
 
     def clear_cookies(self, session_id=None):
         if session_id:
             sql = "DELETE FROM cookie WHERE session_id=?"
-            self.execute(sql, (session_id,))
+            res = self.execute(sql, (session_id,))
+            if res: res.close()
 
     def unset_cookies(self, session_id, cookies=[]):
         if session_id is None:
