@@ -60,6 +60,7 @@ from pycurl_session.spider.schedule.Schedule(custom_settings={})
             - CONCURRENT_REQUESTS - 同时请求连接数。默认16  
             - DOWNLOADER_MIDDLEWARES - (list) 下载中间件  
             - ITEM_PIPELINES - (list) Item管道  
+            - DEPTH_PRIORITY - 是否深度优先。默认是  
 
 add_spider(spider, task_provider=Task, \*\*arg)  
     Parameters:  
