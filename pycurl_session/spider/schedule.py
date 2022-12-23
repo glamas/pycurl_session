@@ -278,7 +278,8 @@ class Schedule(object):
             self.set_multi_cookiejar(request.meta["cookiejar"])
         if "c" in args and isinstance(args["c"], pycurl.Curl):
             c = args["c"]
-            c.in_pool = 0
+            if not hasattr(c, "in_pool"):
+                c.in_pool = 0
             args.pop("c")
         else:
             c = self.get_curl_pool()
@@ -498,6 +499,23 @@ class Schedule(object):
             )
         ):
             self.session._response_redirect(c, logger_handle=self.logger)
+            if self.settings["ROBOTSTXT_OBEY"]:
+                # check new url top_domain if robotstxt check enabled
+                old_top_domain = c.top_domain
+                new_url = c.request["url"]      # update by session._response_redirect()
+                url_parsed = urlparse(new_url)
+                url_domain = url_parsed.netloc
+                new_top_domain = (
+                    url_domain[url_domain.find(".") :]
+                    if len(url_domain.split(".")) >= 2
+                    else url_domain
+                )
+                if new_top_domain != old_top_domain:
+                    # new domain, put back to queue, and delete curl
+                    c.spider_request.url = new_url
+                    self.queue_pending.appendleft(TaskItem(c.spider_id, c.spider_request))
+                    return True
+            # put back to running handle
             self.add_curl_handle(c)
             return False
         self.logger.info(
