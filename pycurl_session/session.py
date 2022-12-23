@@ -525,6 +525,13 @@ class Session(object):
                 c.request["headers"].update({"host": url_info.hostname})
                 headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in c.request["headers"].items()]
                 c.setopt(c.HTTPHEADER, headers_list)
+                request_cookies = self.get_cookies(url, {}, c.session_id)
+                c.request.update({"cookies": request_cookies})
+                if request_cookies:
+                    c.setopt(
+                        pycurl.COOKIE,
+                        "; ".join(["{0}={1}".format(k, v) for k, v in request_cookies.items()]),
+                    )
                 break
         # update curl
         c.setopt(c.REFERER, origin_url)
