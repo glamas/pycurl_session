@@ -1,10 +1,11 @@
 # -*- coding: UTF-8 -*-
 
-from io import BytesIO
+import os
 import json
 import re
-from urllib.parse import urlparse, urljoin, unquote, quote
+from io import BytesIO
 from lxml import etree
+from urllib.parse import urlparse, urljoin, unquote, quote
 
 
 class Response(object):
@@ -153,9 +154,25 @@ class Response(object):
                 break
         return value
 
-    def save(self, path):
-        with open(path, "wb") as f:
-            f.write(self.content.getbuffer())
+    def save(self, path, encoding="utf-8"):
+        dir_path_exists = True
+        dir_path = os.path.dirname(path)
+        if not os.path.exists(dir_path):
+            dir_path_exists = False
+        if self.content.getbuffer().nbytes > 0:
+            if not dir_path_exists:
+                os.makedirs(dir_path)
+            with open(path, "wb") as f:
+                f.write(self.content.getbuffer())
+                return True
+        elif self.text:
+            if not dir_path_exists:
+                os.makedirs(dir_path)
+            enc = self.encoding if self.encoding else encoding
+            with open(path, "w", encoding=enc) as f:
+                f.write(self.text)
+                return True
+        return False
 
 
 class Selector(object):
