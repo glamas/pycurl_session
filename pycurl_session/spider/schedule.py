@@ -276,10 +276,14 @@ class Schedule(object):
         if "cookiejar" in request.meta:
             args["session_id"] = request.meta["cookiejar"]
             self.set_multi_cookiejar(request.meta["cookiejar"])
-        if "c" in args and isinstance(args["c"], pycurl.Curl):
-            c = args["c"]
-            if not hasattr(c, "in_pool"):
-                c.in_pool = 0
+        if "c" in args:
+            if isinstance(args["c"], pycurl.Curl):
+                c = args["c"]
+                if not hasattr(c, "in_pool"):
+                    c.in_pool = 0
+            else:
+                c = self.get_curl_pool()
+                c.in_pool = 1
             args.pop("c")
         else:
             c = self.get_curl_pool()
