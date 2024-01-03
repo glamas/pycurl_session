@@ -266,40 +266,41 @@ class Schedule(object):
         )
         if top_domain not in self.curl_handles:
             self.curl_handles.update({top_domain: {"handles": [], "last": 0}})
-        args = request.args
-        if "method" not in args:
-            method = "GET"
-            args.update({"method": method})
-        else:
-            method = args["method"]
-        request.method = method
-        if "cookiejar" in request.meta:
-            args["session_id"] = request.meta["cookiejar"]
-            self.set_multi_cookiejar(request.meta["cookiejar"])
-        if "c" in args:
-            if isinstance(args["c"], pycurl.Curl):
-                c = args["c"]
-                if not hasattr(c, "in_pool"):
-                    c.in_pool = 0
-            else:
-                c = self.get_curl_pool()
-                c.in_pool = 1
-            args.pop("c")
-        else:
-            c = self.get_curl_pool()
-            c.in_pool = 1
+        args = {
+            "method": request.method,
+            "headers": request.headers,
+            "cookies": request.cookies,
+            "data": request.data,
+            "json": request.json,
+        }
+        meta = request.meta
+        if "cookiejar" in meta:
+            args.update({"session_id": meta["cookiejar"]})
+            self.set_multi_cookiejar(meta["cookiejar"])
+        if "proxy" in meta:
+            args.update({"proxy": meta["proxy"]})
+        if "dont_redirect" in meta and meta["dont_redirect"]:
+            args.update({"allow_redirects": False})
+
+        c = self.get_curl_pool()
+        c.in_pool = 1
         c = self.session.prepare_curl_handle(url=url, c=c, **args)
-        c.meta = request.meta
+        c.meta = meta
         c.top_domain = top_domain
         c.spider_id = spider.spider_id
+        c.max_retry_times = meta.get("max_retry_times", self.settings["RETRY_TIMES"])
+        if meta.get("dont_retry", False):
+            c.max_retry_times = 0
+
         request.cookies = c.request["cookies"]
+        request.headers = c.request["headers"]
         c.spider_request = request
         return c
 
     def run_request_callback(self, request, response, spider):
         spider_id = spider.spider_id
         try:
-            item = request._run_callback(response)
+            item = request._run_callback(response, **request.cb_kwargs)
         except Exception as e:
             spider._get_logger().exception(e)
             return True
@@ -314,12 +315,9 @@ class Schedule(object):
                         self.run_pipeline(result, spider)
                         continue
                     if isinstance(result, Request):
-                        if "headers" not in result.args:
-                            result.args.update({"headers": {}})
-                        if "referer" not in result.args['headers']:
-                            result.args['headers'].update({
-                                "referer": response.request["url"]
-                            })
+                        result.headers.update({
+                            "referer": response.request["url"]
+                        })
                         self.put_pending_taskitem(TaskItem(spider_id, result))
                         self.put_pending_taskitem(TaskItem(spider_id, item))
                         break
@@ -372,12 +370,9 @@ class Schedule(object):
                             continue
                         if isinstance(result, Request):
                             if id(item) in self.response_ref:
-                                if "headers" not in result.args:
-                                    result.args.update({"headers": {}})
-                                if "referer" not in result.args['headers']:
-                                    result.args['headers'].update({
-                                        "referer": self.response_ref[id(item)].request["url"]
-                                    })
+                                result.headers.update({
+                                    "referer": self.response_ref[id(item)].request["url"]
+                                })
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
@@ -533,20 +528,11 @@ class Schedule(object):
         )
         if response.status_code in self.session.retry_http_codes:
             self.session._response_retry(
-                c,
-                max_time=self.settings["RETRY_TIMES"],
-                logger_handle=self.logger,
+                c, logger_handle=self.logger,
             )
-            if c.retry < self.settings["RETRY_TIMES"]:
+            if c.retry <= c.max_retry_times:
                 self.add_curl_handle(c)
                 return False
-            else:
-                self.session._response_retry(
-                    c,
-                    max_time=self.settings["RETRY_TIMES"],
-                    logger_handle=self.logger,
-                )
-                return True
         return self.run_request_callback(c.spider_request, response, spider)
 
     def process_curl_multi_ok(self, c):
@@ -630,7 +616,7 @@ class Schedule(object):
                         break
                 except RetryRequest:
                     c.retry += 1
-                    if c.retry < self.settings["RETRY_TIMES"]:
+                    if c.retry <= c.max_retry_times:
                         self.add_curl_handle(c)
                         free_c = False
                         # middleware control log
