@@ -157,6 +157,7 @@ class Response(object):
     def save(self, path, encoding="utf-8"):
         dir_path_exists = True
         dir_path = os.path.dirname(path)
+        if dir_path == "": dir_path = "./"
         if not os.path.exists(dir_path):
             dir_path_exists = False
         if self.content.getbuffer().nbytes > 0:
