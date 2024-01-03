@@ -99,30 +99,36 @@ _session - (Session) Schedule.session
 settings - (dict) Schedule.settings  
 
 
-class pycurl_session.spider.request.Request(url, callback, meta={}, dont_filter=False, \*\*args)  
+class pycurl_session.spider.request.Request(url, method="GET", callback=None, meta=None,  
+        body=None, data=None, json=None, headers=None, cookies=None,  
+        dont_filter=False, cb_kwargs=None)  
     Parameters:  
         - url(str) - 请求链接  
+        - method(str) - 请求方式  
         - callback(function) - 回调函数  
         - meta(dict) - 数据传递。以下key是特殊值  
             - cookiejar(str) - 指定cookie标识  
             - dont_redirect(bool) - 是否自动跳转  
+            - proxy(str) - 单独设置代理  
+            - dont_redirect(bool) - 是否禁止跳转  
+            - dont_retry(bool) - 是否禁止重试  
+            - max_retry_times(int) - 最大重试次数。0不重试  
+        - body(str, dict, list) - 请求数据，优先data和json  
+        - data(str, dict, list) - 请求数据，优先json  
+        - json(dict) - 请求json数据，仅body和data为空时。并且method会更新为POST  
+        - headers(dict) - 更新请求头  
+        - cookies(dict) - 额外cookies  
         - dont_filter(bool) - 是否过滤  
-        - \*\*args - 其他Session.get()的参数  
+        - cb_kwargs(dict) - 回调函数的指定kw参数  
 
 _run_callback(response) - 保留函数，用于调用  
 
-class pycurl_session.spider.request.FormRequest(url, callback, meta={}, dont_filter=False, \*\*args)  
+class pycurl_session.spider.request.FormRequest(url, \*\*args)  
     Parameters:  
         - url(str) - 请求链接  
-        - callback(function) - 回调函数  
-        - meta(dict) - 数据传递。以下key是特殊值  
-            - cookiejar(str) - 指定cookie标识  
-            - dont_redirect(bool) - 是否自动跳转  
-        - dont_filter(bool) - 是否过滤  
-        - \*\*args - 其他Session.get()的参数  
-            - formdata(dict) - 表单数据  
+        - \*\*args - 其他Request()的参数  
 
-from_response(response, form_id=None, form_name="", form_num=0, method="POST", action=None, formdata=None, files=None, callback=None, \*\*args)  
+from_response(response, form_id=None, form_name="", form_num=0, method="POST", action=None, formdata=None, callback=None, \*\*args)  
     Parameters:  
         - response(Response) - 响应类  
         - form_id(str) - 表单id  
@@ -131,9 +137,8 @@ from_response(response, form_id=None, form_name="", form_num=0, method="POST", a
         - method(str) - 请求方式  
         - action(str) - 指定表单的action。默认会从获取的表单里拿  
         - formdata(dict) - 指定表单数据  
-        - files(dict) - 文件发送  
         - callback(function) - 回调函数  
-        - \*\*args - 其他Session.get()的参数  
+        - \*\*args - 其他Request()的参数  
     Return:  
         - Request  
 
@@ -247,11 +252,11 @@ Task初始化只支持传入Spider实例，即add_spider()的第一个参数，�
 - 只支持process_request(), process_response()和process_exception()。没有from_crawler()
 
 ### Request/FormRequest
-- 参数没有body，可以通过data参数，但不支持bytes类型
+- 有body参数，实际使用data，但不支持bytes类型
 - 参数没有errback。目前错误处理还不完善
-- 参数没有priority/encoding/flags/cb_kwargs
+- 参数没有priority/encoding/flags
 - from_response()参数没有clickdata/dont_click
-- 没有JsonRequest()，可以通过Request()的json_data参数
+- 没有JsonRequest()，可以通过Request()的json参数
 
 ### Response
 - body是str类型，只读。可以通过text设置。在Scrapy里body是bytes类型

@@ -49,7 +49,7 @@ set_proxy(proxy)
 
 prepare_curl_handle(method, url, c=None,  
         headers=None, cookies=None, auth=None, proxy=None, cert=None,  
-        params=None, data=None, json_data=None, files=None, multipart=False,  
+        params=None, data=None, json=None, files=None, multipart=False,  
         timeout=None, allow_redirects=True,  
         hooks=None, stream=None, verify=True, verbose=False, quote_safe="/",  
         session_id=None)  
@@ -63,7 +63,7 @@ prepare_curl_handle(method, url, c=None,
         - cert(str) - 指定cert文件路径  
         - params(dict, str) - url添加额外的query参数  
         - data(dict, str) - post的数据。如果是字典类型，并且值的第一个字符是'@'，会被认为是文件  
-        - json_data(dict, str) - json字典，或者包含json数据的文件(str, 例如'@json_file.txt')，或者json字符串  
+        - json(dict, str) - json字典，或者包含json数据的文件(str, 例如'@json_file.txt')，或者json字符串  
         - files(dict) - post的文件，例如{'field': 'file.txt'} 或者{'field': ['file1.txt', 'file2.txt']}  
         - multipart(bool) - 是否指定按Multipart/form-data形式提交  
         - timeout(int) - 超时设置，覆盖默认的超时设置，单次有效  
