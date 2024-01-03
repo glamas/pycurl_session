@@ -42,7 +42,7 @@ class Statistics:
 
     def process_request(self, request, spider):
         url = request.url
-        method = request.args["method"] if "method" in request.args else "GET"
+        method = request.method
         callback_name = request.callback.__name__
         spider_id = spider.spider_id
         if (

@@ -4,7 +4,7 @@ import os
 import sys
 import pycurl
 import certifi
-import json
+import json as m_json
 import time
 import tempfile
 import uuid
@@ -58,7 +58,7 @@ class Session(object):
         self.useragent = ""
         # self.response_headers = []
         self.history = []
-        self._retry_times = 3
+        self._max_retry_times = 3
         self._retry_interval = 5
         self._backoff = [self._retry_interval]
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
@@ -124,7 +124,7 @@ class Session(object):
 
     def send(self, c):
         while True:
-            if c.retry > self._retry_times:
+            if c.retry > c.max_retry_times:
                 break
             try:
                 c.perform()
@@ -143,18 +143,18 @@ class Session(object):
                     )
                 )
                 if response.status_code in self.retry_http_codes:
-                    self._response_retry(c, max_time=self._retry_times, logger_handle=logger)
+                    self._response_retry(c, logger_handle=logger)
                     continue
                 break
             except pycurl.error as e:
                 ## todo: process error
                 code, msg = e.args
-                if code == 28 and c.retry < self._retry_times:
+                if code == 28 and c.retry < c.max_retry_times:
                     logger.error(msg)
                 else:
                     raise
                 c.retry += 1
-                if c.retry <= self._retry_times:
+                if c.retry <= c.max_retry_times:
                     logger.info("Retry [{0}] {1}".format(c.retry, c.request["url"]))
                     c.header_handle.clear()
                     c.response_headers.clear()
@@ -184,6 +184,7 @@ class Session(object):
         else:
             c.buffer = BytesIO()
         if not hasattr(c, "retry"): c.retry = 0
+        if not hasattr(c, "max_retry_times"): c.max_retry_times = self._max_retry_times
         if not hasattr(c, "allow_redirects"): c.allow_redirects = True
         if not hasattr(c, "proxy"): c.proxy = ""
         if not hasattr(c, "cert"): c.cert = ""
@@ -195,7 +196,7 @@ class Session(object):
         # fmt: off
         self, method, url, c=None,
         headers=None, cookies=None, auth=None, proxy=None, cert=None,
-        params=None, data=None, json_data=None, files=None, multipart=False,
+        params=None, data=None, json=None, files=None, multipart=False,
         timeout=None, allow_redirects=True,
         hooks=None, stream=None, verify=True, verbose=False, quote_safe="/",
         session_id=None
@@ -212,6 +213,7 @@ class Session(object):
                 response_headers: list
                 buffer: BytesIO
                 retry: int
+                max_retry_times: int
                 allow_redirects: bool
                 proxy: str
                 cert: str
@@ -300,6 +302,7 @@ class Session(object):
         #       json_data and data accept dict or raw_str, note: "@path" is string here
         # for get:
         #   params accept dict or raw_str
+        json_data = json
         c.request.update({"method": method.upper()})
         if method.lower() == "post":
             c.setopt(c.POST, 1)
@@ -366,12 +369,12 @@ class Session(object):
                     json_file = json_data[1:]
                     if os.path.exists(json_file):
                         with open(json_file) as f:
-                            json_data = json.loads(f.read())
+                            json_data = m_json.loads(f.read())
                     else:
                         # warning
                         json_data = {}
                 json_body = (
-                    json.dumps(json_data) if isinstance(json_data, dict) else json_data
+                    m_json.dumps(json_data) if isinstance(json_data, dict) else json_data
                 )
                 c.setopt(c.POSTFIELDS, json_body)
             elif data is not None:
@@ -397,11 +400,11 @@ class Session(object):
                 c.setopt(c.POSTFIELDS, data_body)
             elif json_data is not None:
                 data_body = (
-                    json.dumps(json_data) if isinstance(json_data, dict) else json_data
+                    m_json.dumps(json_data) if isinstance(json_data, dict) else json_data
                 )
                 c.setopt(c.POSTFIELDS, data_body)
             else:
-                data_body = json.dumps(data) if isinstance(data, dict) else data
+                data_body = m_json.dumps(data) if isinstance(data, dict) else data
                 c.setopt(c.POSTFIELDS, data_body)
         elif method.lower() == "get":
             c.setopt(c.HTTPGET, 1)
@@ -563,13 +566,13 @@ class Session(object):
                 )
             )
 
-    def _response_retry(self, c, max_time=3, logger_handle=None):
+    def _response_retry(self, c, logger_handle=None):
         c.retry += 1
         if c.retry >= len(self._backoff):
             sleep_time = self._backoff[-1]
         else:
             sleep_time = self._backoff[(c.retry - 1) % len(self._backoff)]
-        if c.retry <= max_time:
+        if c.retry <= c.max_retry_times:
             if logger_handle:
                 logger_handle.info(
                     "Retry #{0} [after {1}s] {2}".format(
@@ -585,16 +588,24 @@ class Session(object):
             time.sleep(sleep_time)
         else:
             if logger_handle:
-                logger_handle.info(
-                    "Failed to process <{0} {1}>, try max time.".format(
-                        c.request["method"],
-                        c.request["url"]
+                if c.max_retry_times > 0:
+                    logger_handle.info(
+                        "Failed to process <{0} {1}>, try max time.".format(
+                            c.request["method"],
+                            c.request["url"]
+                        )
                     )
-                )
+                else:
+                    logger_handle.info(
+                        "Failed with no retry <{0} {1}>".format(
+                            c.request["method"],
+                            c.request["url"]
+                        )
+                    )
 
     def set_retry_times(self, times: int = 3, backoff: list = []):
         if times and int(times) > 0:
-            self._retry_times = times
+            self._max_retry_times = times
         if backoff and isinstance(backoff, list):
             self._backoff = [x for x in backoff if isinstance(x, (int, float))]
 

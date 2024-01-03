@@ -4,15 +4,38 @@ from pycurl_session.response import Response
 
 
 class Request(object):
-    def __init__(self, url, callback, meta={}, dont_filter=False, **args):
+    def __init__(self, url, method="GET", callback=None, meta=None, 
+        body=None, data=None, json=None, headers=None, cookies=None,
+        dont_filter=False, cb_kwargs=None,
+        # encoding="utf-8", errback=None,
+    ):
+        ''' Request: url, method, callback, meta, headers, cookies, dont_filter, cb_kwargs'''
         self.url = url
         self.callback = callback
-        self.meta = meta
+        self.meta = meta or {}
+        # body > data > json
+        _data = None
+        if body: _data = body
+        elif data: _data = data
+        if not _data and json and method == "GET":
+            # only json data, change method from GET to POST
+            method = "POST"
+        self.method = method
+        self.headers = headers or {}
+        self.cookies = cookies or {}
+        self.body = body
+        self.data = _data
+        self.json = json if not _data else None
         self.dont_filter = dont_filter
-        self.args = args
+        self.cb_kwargs = {}
+        if cb_kwargs and isinstance(cb_kwargs, dict):
+            self.cb_kwargs = cb_kwargs
 
-    def _run_callback(self, response):
-        return self.callback(response)
+    def _run_callback(self, response, **cb_kwargs):
+        if self.callback and callable(self.callback):
+            return self.callback(response, **cb_kwargs)
+        else:
+            return None
 
 
 class FormRequest(Request):
