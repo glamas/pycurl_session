@@ -129,7 +129,6 @@ class Session(object):
             try:
                 c.perform()
                 response = self.gather_response(c)
-                perform_time = c.getinfo(pycurl.TOTAL_TIME)
                 if response.status_code in self.redirect_http_codes and c.allow_redirects:
                     self._response_redirect(c, logger_handle=logger)
                     continue
@@ -138,7 +137,7 @@ class Session(object):
                         response.status_code,
                         c.request["method"],
                         c.request["url"],
-                        perform_time,
+                        c.getinfo(pycurl.TOTAL_TIME),
                         c.request["referer"],
                     )
                 )
@@ -147,9 +146,11 @@ class Session(object):
                     continue
                 break
             except pycurl.error as e:
-                ## todo: process error
+                # timeout or raise error
+                # 28 - OPERATION_TIMEDOUT
+                # 12 - FTP_ACCEPT_TIMEOUT
                 code, msg = e.args
-                if code == 28 and c.retry < c.max_retry_times:
+                if code in [12, 28] and c.retry < c.max_retry_times:
                     logger.error(msg)
                 else:
                     raise
