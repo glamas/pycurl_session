@@ -64,7 +64,7 @@ class Statistics:
 
     def process_exception(self, request, exception, spider):
         logger = spider._get_logger()
-        if exception.errno == 28:
+        if exception.errno in [12, 28]:
             self.section_count("timeout_count", exception.errno)
             logger.error("Timeout ({0}, {1}) when <{2} {3}>".format(
                 exception.errno, exception.errmsg, request.method, request.url
