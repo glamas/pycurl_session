@@ -123,6 +123,7 @@ class Session(object):
         return self.send(c)
 
     def send(self, c):
+        response = Response()
         while True:
             if c.retry > c.max_retry_times:
                 break
@@ -199,7 +200,7 @@ class Session(object):
         headers=None, cookies=None, auth=None, proxy=None, cert=None,
         params=None, data=None, json=None, files=None, multipart=False,
         timeout=None, allow_redirects=True,
-        hooks=None, stream=None, verify=True, verbose=False, quote_safe="/",
+        hooks=None, stream=None, verify=True, verbose=False, quote_safe="",
         session_id=None
         # fmt: on
     ):
@@ -225,8 +226,8 @@ class Session(object):
         self.init_curl_var(c)
         c.session_id = session_id if session_id else None
 
-        if " " in url:
-            url = url.replace(" ", "%20")
+        # if " " in url:
+        #     url = url.replace(" ", "%20")
         url_info = urlparse(url)
         scheme = url_info.scheme
         domain = url_info.hostname
@@ -251,10 +252,10 @@ class Session(object):
             for pair in query.split("&"):
                 kv = pair.split("=", 1)
                 if len(kv) == 2:
-                    _tmp.append("{0}={1}".format(kv[0], quote(unquote(kv[1]), safe=quote_safe)))
+                    _tmp.append(tuple(kv))
                 else:
-                    _tmp.append("{0}".format(quote(unquote(kv[0]), safe=quote_safe)))
-            query = "&".join(_tmp)
+                    _tmp.append((kv, ""))
+            query = urlencode(_tmp, safe=quote_safe)
         if query: url = url.split("?")[0] + "?" + query
         c.request.update({"url": url})
         c.setopt(c.URL, url)
