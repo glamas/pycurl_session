@@ -230,16 +230,12 @@ class Session(object):
         # reconstruct url
         url_info = urlparse(url)
         netloc = url_info.netloc
-        domain = url_info.hostname
+        scheme = url_info.scheme.lower()
 
         # check BASIC AUTH. Url first
         if url_info.username:
             auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
             netloc = netloc.split("@")[-1]
-
-        scheme = url_info.scheme.lower()
-        if scheme == "https":
-            self._set_ssl(c)
 
         query = url_info.query if url_info.query else ""
         if params:
@@ -266,15 +262,19 @@ class Session(object):
         c.request.update({"url": url})
         c.setopt(c.URL, url)
 
-        request_headers = self._prepare_request_headers(c, headers, url)
-        self._set_proxy(c, proxy)
-        self._set_verbose(c, verbose)
+        if scheme == "https":
+            self._set_ssl(c)
 
+        domain = url_info.hostname
         if isinstance(auth, HTTPAUTH):
             auth.attach(c, url, request_headers)
             self.auth.update({domain: auth})
         elif domain in self.auth:
             self.auth[domain].attach(c, url, request_headers)
+
+        request_headers = self._prepare_request_headers(c, headers, url)
+        self._set_proxy(c, proxy)
+        self._set_verbose(c, verbose)
 
         request_cookies = self.get_cookies(url, cookies, c.session_id)
         c.request.update({"cookies": request_cookies})
