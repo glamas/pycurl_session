@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime
 from io import BytesIO
 from urllib.parse import urlparse, urlencode, urljoin, unquote, quote
+from urllib.parse import ParseResult, urlunparse
 from pycurl_session.cache import CacheDB
 from pycurl_session.response import Response
 from pycurl_session.auth import HTTPAUTH, HTTPAUTH_BASIC
@@ -226,23 +227,21 @@ class Session(object):
         self.init_curl_var(c)
         c.session_id = session_id if session_id else None
 
-        # if " " in url:
-        #     url = url.replace(" ", "%20")
+        # reconstruct url
         url_info = urlparse(url)
-        scheme = url_info.scheme
+        netloc = url_info.netloc
         domain = url_info.hostname
 
-        # check BASIC AUTH
+        # check BASIC AUTH. Url first
         if url_info.username:
             auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
-            url = url[:url.find("//") + 2] + url[url.find(domain):]
+            netloc = netloc.split("@")[-1]
 
-        if scheme.lower() == "https":
+        scheme = url_info.scheme.lower()
+        if scheme == "https":
             self._set_ssl(c)
 
-        query = ""
-        if url_info.query:
-            query = url_info.query
+        query = url_info.query if url_info.query else ""
         if params:
             if isinstance(params, dict):
                 params = "&".join(["{0}={1}".format(k, v) for k, v in params.items()])
@@ -256,7 +255,14 @@ class Session(object):
                 else:
                     _tmp.append((kv, ""))
             query = urlencode(_tmp, safe=quote_safe)
-        if query: url = url.split("?")[0] + "?" + query
+        url = urlunparse(ParseResult(
+            scheme,
+            netloc,
+            quote(unquote(url_info.path)),
+            quote(unquote(url_info.params), safe="=;,"),    # rfc3986 3.3. Path
+            query,
+            quote(unquote(url_info.fragment))
+        ))
         c.request.update({"url": url})
         c.setopt(c.URL, url)
 
