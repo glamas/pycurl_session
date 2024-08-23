@@ -79,7 +79,7 @@ class Response(object):
         formname="",
         formxpath="",
         formcss="",
-        formnumber=0,
+        formnumber=1,
         method="POST",
         action=None,
         formdata=None,
@@ -107,7 +107,7 @@ class Response(object):
             files=files,
             **args
         )
-        return self.session.request(c)
+        return self.session.send(c)
 
     def _get_form(self, formid=None, formname="", formxpath="", formcss="", formnumber=1):
         if formid:
@@ -119,7 +119,9 @@ class Response(object):
         elif formcss:
             form = self.css(formcss).get()
         else:
-            form = self.xpath("(//form)[{0}]".format(formnumber + 1)).get()
+            if not formnumber: formnumber = 1
+            if isinstance(formnumber, int) and formnumber < 1: formnumber = 1
+            form = self.xpath("(//form)[{0}]".format(formnumber)).get()
         if form is None:
             raise Exception("form not found")
         form = Selector(ele=form)
