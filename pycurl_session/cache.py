@@ -69,7 +69,7 @@ CREATE TABLE cookie (
 
     query = execute
 
-    def get_cookies(self, session_id, request_url="", default={}):
+    def get_cookies(self, session_id, request_url="", default=None):
         if session_id is None:
             return {}
         if request_url:
@@ -136,9 +136,10 @@ CREATE TABLE cookie (
             res = self.execute(sql, (session_id,))
             if res: res.close()
 
-    def unset_cookies(self, session_id, cookies=[]):
+    def unset_cookies(self, session_id, cookies=None):
         if session_id is None:
             return
+        cookies = cookies or []
         params = []
         for cookie in cookies:
             if len(cookie) >= 2:

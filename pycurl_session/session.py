@@ -231,6 +231,7 @@ class Session(object):
         url_info = urlparse(url)
         netloc = url_info.netloc
         scheme = url_info.scheme.lower()
+        domain = url_info.hostname
 
         # check BASIC AUTH. Url first
         if url_info.username:
@@ -265,23 +266,46 @@ class Session(object):
         if scheme == "https":
             self._set_ssl(c)
 
-        domain = url_info.hostname
+        request_headers = self._prepare_request_headers(c, headers, url)
+        self._set_proxy(c, proxy)
+        self._set_verbose(c, verbose)
+
         if isinstance(auth, HTTPAUTH):
             auth.attach(c, url, request_headers)
             self.auth.update({domain: auth})
         elif domain in self.auth:
             self.auth[domain].attach(c, url, request_headers)
 
-        request_headers = self._prepare_request_headers(c, headers, url)
-        self._set_proxy(c, proxy)
-        self._set_verbose(c, verbose)
-
-        request_cookies = self.get_cookies(url, cookies, c.session_id)
-        c.request.update({"cookies": request_cookies})
-        if request_cookies:
+        # priority from low to high: cache -> session -> header -> params
+        # request_headers include cookie in header and session
+        new_cookies = self.get_cookies(url, c.session_id)
+        if "cookie" in request_headers:
+            cookies_in_header_str = request_headers.pop("cookie")
+            for item in cookies_in_header_str.split(";"):
+                kv = item.strip().split("=")
+                if len(kv) == 2:
+                    new_cookies.update({kv[0]: kv[1]})
+        if cookies:
+            if isinstance(cookies, dict):
+                new_cookies.update(cookies)
+            elif isinstance(cookies, str):
+                for item in cookies.split(";"):
+                    kv = item.strip().split("=")
+                    if len(kv) == 2:
+                        new_cookies.update({kv[0]: kv[1]})
+            elif isinstance(cookies, list):
+                for kv in cookies:
+                    if len(kv) == 2:
+                        new_cookies.update({"{0}".format(kv[0]): "{0}".format(kv[1])})
+        c.request.update({"cookies": new_cookies})
+        if new_cookies:
+            request_headers.update({
+                "cookie": "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()])
+            })
+            # set pycurl.COOKIE not work?
             c.setopt(
                 pycurl.COOKIE,
-                "; ".join(["{0}={1}".format(k, v) for k, v in request_cookies.items()]),
+                "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()]),
             )
 
         ## data send
@@ -494,6 +518,11 @@ class Session(object):
         request_referer = None
         if headers and isinstance(headers, dict):
             for k, v in headers.items():
+                if k.lower() == "cookie":
+                    if "cookie" not in request_headers:
+                        request_headers.update({"cookie": ""})
+                    request_headers["cookie"] = request_headers["cookie"] + "; " + v
+                    continue
                 request_headers.update({k.lower(): v})
                 if k.lower() == "referer":
                     request_referer = v
@@ -504,6 +533,11 @@ class Session(object):
             for s in headers:
                 t = s.split(":", 1)
                 if len(t) == 2:
+                    if t[0].lower() == "cookie":
+                        if "cookie" not in request_headers:
+                            request_headers.update({"cookie": ""})
+                        request_headers["cookie"] = request_headers["cookie"] + "; " + t[1]
+                        continue
                     request_headers.update({t[0].lower(): t[1]})
                     if t[0].lower() == "referer":
                         request_referer = t[1]
@@ -536,7 +570,7 @@ class Session(object):
                 c.request["headers"].update({"host": url_info.hostname})
                 headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in c.request["headers"].items()]
                 c.setopt(c.HTTPHEADER, headers_list)
-                request_cookies = self.get_cookies(url, {}, c.session_id)
+                request_cookies = self.get_cookies(url, c.session_id)
                 c.request.update({"cookies": request_cookies})
                 if request_cookies:
                     c.setopt(
@@ -800,19 +834,20 @@ class Session(object):
         if len(params_del):
             self.cookie_db.delete_cookies(params_del)
 
-    def get_cookies(self, request_url="", cookies={}, session_id=None):
+    def get_cookies(self, request_url="", session_id=None):
         if not session_id:
             session_id = self.session_id
-        return self.cookie_db.get_cookies(session_id, request_url, cookies)
+        return self.cookie_db.get_cookies(session_id, request_url)
 
     def clear_cookies(self, session_id=None):
         if not session_id:
             session_id = self.session_id
         self.cookie_db.clear_cookies(session_id)
 
-    def unset_cookies(self, session_id=None, cookies=[]):
+    def unset_cookies(self, session_id=None, cookies=None):
         if not session_id:
             session_id = self.session_id
+        cookies = cookies or []
         self.cookie_db.unset_cookies(session_id, cookies)
 
     def byte2str(self, data, encoding="utf-8"):
