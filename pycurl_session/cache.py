@@ -6,6 +6,8 @@ import time
 import traceback
 from urllib.parse import urlparse
 
+from .utils.domain import get_tld
+
 
 class CacheDB(object):
     def __init__(self, db_name):
@@ -77,13 +79,7 @@ CREATE TABLE cookie (
         else:
             return {}
         url_parsed = urlparse(url)
-        url_domain = url_parsed.netloc
-        url_domain_split = url_domain.split(".")
-        if len(url_domain_split) >= 2:
-            top_domain = url_domain_split[-2] + "." + url_domain_split[-1]
-        else:
-            top_domain = url_domain.lstrip(".")
-        url_path = url_parsed.path if url_parsed.path else "/"
+        url_domain = url_parsed.hostname
 
         cookies = default if default else {}
         if cookies:
@@ -100,13 +96,23 @@ CREATE TABLE cookie (
             res = self.executemany(sql, params)
             if res: res.close()
 
+        url_path = url_parsed.path if url_parsed.path else "/"
+        top_domain = get_tld(url)
+        domain_list = [top_domain]
+        url_domain_split = url_domain.split(".")
+        for i in range(len(url_domain_split)):
+            subdomain = ".".join(url_domain_split[i:])
+            if subdomain == top_domain:
+                break
+            domain_list.append(subdomain)
+        domain_list.extend(["." + item for item in domain_list])
         sql = (
             "SELECT name, value, domain, path, expires FROM cookie"
-            " WHERE session_id=? AND (domain=? OR domain=? OR domain like ?) AND (expires='' OR expires>?)"
+            " WHERE session_id=? AND domain in ({}) AND (expires='' OR expires>?)"
             " ORDER BY domain, path"
-        )
+        ).format(", ".join('?'*len(domain_list)))
         now = int(time.time())
-        params = (session_id, top_domain, "." + top_domain, "%" + url_domain, now)
+        params = (session_id, *domain_list, now)
         res = self.execute(sql, params)
         for item in res.fetchall():
             path = item[3]
