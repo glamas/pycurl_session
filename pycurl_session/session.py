@@ -195,6 +195,38 @@ class Session(object):
         # for spider
         # if hasattr(c, "spider_request"): c.spider_request = None
 
+
+    def reconstruct_url(self, url_info, params=None, quote_safe=""):
+        netloc = url_info.netloc
+        scheme = url_info.scheme.lower()
+
+        if url_info.username:
+            netloc = netloc.split("@")[-1]
+
+        query = url_info.query if url_info.query else ""
+        if params:
+            if isinstance(params, dict):
+                params = "&".join(["{0}={1}".format(k, v) for k, v in params.items()])
+            query = query + "&" + params if query else params
+        if query:
+            _tmp = []
+            for pair in query.split("&"):
+                kv = pair.split("=", 1)
+                if len(kv) == 2:
+                    _tmp.append(tuple(kv))
+                else:
+                    _tmp.append((kv, ""))
+            query = urlencode(_tmp, safe=quote_safe)
+        return urlunparse(ParseResult(
+            scheme,
+            netloc,
+            quote(unquote(url_info.path)),
+            quote(unquote(url_info.params), safe="=;,"),    # rfc3986 3.3. Path
+            query,
+            quote(unquote(url_info.fragment))
+        ))
+
+
     def prepare_curl_handle(
         # fmt: off
         self, method, url, c=None,
@@ -227,49 +259,47 @@ class Session(object):
         self.init_curl_var(c)
         c.session_id = session_id if session_id else None
 
-        # reconstruct url
-        url_info = urlparse(url)
-        netloc = url_info.netloc
-        scheme = url_info.scheme.lower()
-        domain = url_info.hostname
-
-        # check BASIC AUTH. Url first
-        if url_info.username:
-            auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
-            netloc = netloc.split("@")[-1]
-
-        query = url_info.query if url_info.query else ""
-        if params:
-            if isinstance(params, dict):
-                params = "&".join(["{0}={1}".format(k, v) for k, v in params.items()])
-            query = query + "&" + params if query else params
-        if query:
-            _tmp = []
-            for pair in query.split("&"):
-                kv = pair.split("=", 1)
-                if len(kv) == 2:
-                    _tmp.append(tuple(kv))
-                else:
-                    _tmp.append((kv, ""))
-            query = urlencode(_tmp, safe=quote_safe)
-        url = urlunparse(ParseResult(
-            scheme,
-            netloc,
-            quote(unquote(url_info.path)),
-            quote(unquote(url_info.params), safe="=;,"),    # rfc3986 3.3. Path
-            query,
-            quote(unquote(url_info.fragment))
-        ))
-        c.request.update({"url": url})
-        c.setopt(c.URL, url)
-
-        if scheme == "https":
-            self._set_ssl(c)
-
-        request_headers = self._prepare_request_headers(c, headers, url)
         self._set_proxy(c, proxy)
         self._set_verbose(c, verbose)
 
+        # common setting
+        c.allow_redirects = allow_redirects
+        c.setopt(c.FOLLOWLOCATION, 0)
+        if not timeout:
+            timeout = self._timeout
+        c.setopt(c.CONNECTTIMEOUT, timeout)
+        c.setopt(c.TIMEOUT, timeout)
+        # c.setopt(c.HEADER,1)    # write header + body
+        c.setopt(c.MAXREDIRS, 5)
+        # c.setopt(c.ENCODING, "")
+        # c.setopt(c.ENCODING, "gzip,deflate")
+        # c.setopt(c.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
+        c.setopt(c.HEADERFUNCTION, c.header_handle.write)
+        c.setopt(c.WRITEDATA, c.buffer)
+
+        # if len(self.history) > 0 and request_referer == None:
+        #     request_referer = self.history[-1]
+        #     c.setopt(c.REFERER, self.history[-1])
+        # if request_referer:
+        #     c.setopt(c.REFERER, request_referer)
+        # c.request.update({"referer": request_referer})
+
+        # reconstruct url
+        url_info = urlparse(url)
+        domain = url_info.hostname
+
+        url = self.reconstruct_url(url_info, params, quote_safe=quote_safe)
+        c.request.update({"url": url})
+        c.setopt(c.URL, url)
+
+        if url_info.scheme.lower() == "https":
+            self._set_ssl(c)
+
+        # parse headers before check auth
+        request_headers = self._prepare_request_headers(c, headers, url)
+        # check BASIC AUTH. Url first
+        if url_info.username:
+            auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
         if isinstance(auth, HTTPAUTH):
             auth.attach(c, url, request_headers)
             self.auth.update({domain: auth})
@@ -299,14 +329,10 @@ class Session(object):
                         new_cookies.update({"{0}".format(kv[0]): "{0}".format(kv[1])})
         c.request.update({"cookies": new_cookies})
         if new_cookies:
-            request_headers.update({
-                "cookie": "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()])
-            })
-            # set pycurl.COOKIE not work?
-            c.setopt(
-                pycurl.COOKIE,
-                "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()]),
-            )
+            # both work, but header first
+            cookie_str = "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()])
+            request_headers.update({"cookie": cookie_str})
+            c.setopt(pycurl.COOKIE, cookie_str)
 
         ## data send
         # for post:
@@ -448,30 +474,6 @@ class Session(object):
         c.request.update({"headers": request_headers})
         headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
         c.setopt(c.HTTPHEADER, headers_list)
-
-        # if len(self.history) > 0 and request_referer == None:
-        #     request_referer = self.history[-1]
-        #     c.setopt(c.REFERER, self.history[-1])
-        # if request_referer:
-        #     c.setopt(c.REFERER, request_referer)
-        # c.request.update({"referer": request_referer})
-
-        c.allow_redirects = allow_redirects
-        c.setopt(c.FOLLOWLOCATION, 0)
-
-        if not timeout:
-            timeout = self._timeout
-        c.setopt(c.CONNECTTIMEOUT, timeout)
-        c.setopt(c.TIMEOUT, timeout)
-
-        # c.setopt(c.HEADER,1)    # write header + body
-        c.setopt(c.MAXREDIRS, 5)
-        c.setopt(c.ENCODING, "")
-        # c.setopt(c.ENCODING, "gzip,deflate")
-        # c.setopt(c.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
-
-        c.setopt(c.HEADERFUNCTION, c.header_handle.write)
-        c.setopt(c.WRITEDATA, c.buffer)
         return c
 
     def gather_response(self, c):
@@ -559,24 +561,45 @@ class Session(object):
             if "location:" in header.lower():
                 url = header.split(":", 1)[1].strip()
                 url = urljoin(origin_url, url)
-                if " " in url:
-                    url = url.replace(" ", "%20")
+                url_info = urlparse(url)
+                # reset url
+                url = self.reconstruct_url(url_info)
                 c.request.update({"url": url})
                 c.setopt(c.URL, url)
-
-                url_info = urlparse(url)
                 if url_info.scheme.lower() == "https":
                     self._set_ssl(c)
-                c.request["headers"].update({"host": url_info.hostname})
-                headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in c.request["headers"].items()]
+
+                domain = url_info.hostname
+                c.request["headers"].update({"host": domain})
+                # reset auth, if need
+                origin_url_info = urlparse(origin_url)
+                if domain != origin_url_info.hostname:
+                    request_headers = c.request["headers"]
+                    if domain in self.auth:
+                        self.auth[domain].attach(c, url, request_headers)
+                    else:
+                        if url_info.username:
+                            auth = HTTPAUTH_BASIC(url_info.username, url_info.password)
+                            auth.attach(c, url, request_headers)
+                            self.auth.update({domain: auth})
+                # reset cookie
+                new_cookies = self.get_cookies(url, c.session_id)
+                if "cookie" in request_headers:
+                    cookies_in_header_str = request_headers.pop("cookie")
+                    for item in cookies_in_header_str.split(";"):
+                        kv = item.strip().split("=")
+                        if len(kv) == 2:
+                            new_cookies.update({kv[0]: kv[1]})
+                c.request.update({"cookies": new_cookies})
+                if new_cookies:
+                    # both work, but header first
+                    cookie_str = "; ".join(["{0}={1}".format(k, v) for k, v in new_cookies.items()])
+                    request_headers.update({"cookie": cookie_str})
+                    c.setopt(pycurl.COOKIE, cookie_str)
+                # reset header
+                c.request.update({"headers": request_headers})
+                headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
                 c.setopt(c.HTTPHEADER, headers_list)
-                request_cookies = self.get_cookies(url, c.session_id)
-                c.request.update({"cookies": request_cookies})
-                if request_cookies:
-                    c.setopt(
-                        pycurl.COOKIE,
-                        "; ".join(["{0}={1}".format(k, v) for k, v in request_cookies.items()]),
-                    )
                 break
         # update curl
         c.setopt(c.REFERER, origin_url)
