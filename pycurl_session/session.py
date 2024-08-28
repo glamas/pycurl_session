@@ -271,7 +271,7 @@ class Session(object):
         c.setopt(c.TIMEOUT, timeout)
         # c.setopt(c.HEADER,1)    # write header + body
         c.setopt(c.MAXREDIRS, 5)
-        # c.setopt(c.ENCODING, "")
+        c.setopt(c.ENCODING, "")    # Important
         # c.setopt(c.ENCODING, "gzip,deflate")
         # c.setopt(c.HTTP_VERSION, pycurl.CURL_HTTP_VERSION_2)
         c.setopt(c.HEADERFUNCTION, c.header_handle.write)
@@ -847,8 +847,7 @@ class Session(object):
                             name = kv_split[0].strip()
                             value = kv_split[1].strip()
                 if domain == "":
-                    url_parsed = urlparse(response.url)
-                    domain = url_parsed.netloc
+                    domain = urlparse(response.url).hostname
                 params.append((session_id, name, value, domain, path, expires))
                 if name not in response.cookies:
                     response.cookies.update({name: value})
