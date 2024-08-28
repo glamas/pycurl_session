@@ -573,7 +573,8 @@ class Session(object):
                 c.request["headers"].update({"host": domain})
                 # reset auth, if need
                 origin_url_info = urlparse(origin_url)
-                if domain != origin_url_info.hostname:
+                origin_domain = origin_url_info.hostname
+                if domain != origin_domain:
                     request_headers = c.request["headers"]
                     if domain in self.auth:
                         self.auth[domain].attach(c, url, request_headers)
@@ -584,7 +585,10 @@ class Session(object):
                             self.auth.update({domain: auth})
                 # reset cookie
                 new_cookies = self.get_cookies(url, c.session_id)
-                if "cookie" in request_headers:
+                if "cookie" in request_headers and origin_domain in domain:
+                    # when two domain is same or new domain is subdomain
+                    # add/update cookie in origin header
+                    # NOTE: not exactly correct
                     cookies_in_header_str = request_headers.pop("cookie")
                     for item in cookies_in_header_str.split(";"):
                         kv = item.strip().split("=")
