@@ -571,11 +571,11 @@ class Session(object):
 
                 domain = url_info.hostname
                 c.request["headers"].update({"host": domain})
+                request_headers = c.request["headers"]
                 # reset auth, if need
                 origin_url_info = urlparse(origin_url)
                 origin_domain = origin_url_info.hostname
                 if domain != origin_domain:
-                    request_headers = c.request["headers"]
                     if domain in self.auth:
                         self.auth[domain].attach(c, url, request_headers)
                     else:
