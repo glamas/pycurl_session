@@ -162,6 +162,8 @@ class Response(object):
         if dir_path == "": dir_path = "./"
         if not os.path.exists(dir_path):
             dir_path_exists = False
+        if self.content:
+            self.content.seek(0)
         if self.content.getbuffer().nbytes > 0:
             if not dir_path_exists:
                 os.makedirs(dir_path)
