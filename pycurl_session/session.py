@@ -63,7 +63,7 @@ class Session(object):
         self._retry_interval = 5
         self._backoff = [self._retry_interval]
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
-        self.redirect_http_codes = [301, 302, 307, 308]
+        self.redirect_http_codes = [301, 302, 303, 307, 308]
         self._timeout = 30
 
         self._fh = None
@@ -132,7 +132,7 @@ class Session(object):
                 c.perform()
                 response = self.gather_response(c)
                 if response.status_code in self.redirect_http_codes and c.allow_redirects:
-                    self._response_redirect(c, logger_handle=logger)
+                    self._response_redirect(c, response.status_code, logger_handle=logger)
                     continue
                 logger.info(
                     "({0}) <{1} {2} {3}s> (referer: {4})".format(
@@ -551,7 +551,7 @@ class Session(object):
             c.request.update({"referer": None})
         return request_headers
 
-    def _response_redirect(self, c, logger_handle=None):
+    def _response_redirect(self, c, status_code, logger_handle=None):
         origin_url = c.request["url"]
         origin_method = c.request["method"].upper()
 
@@ -605,15 +605,27 @@ class Session(object):
                 break
         # update curl
         c.setopt(c.REFERER, origin_url)
-        if origin_method == "POST":
+        # for 3xx, update method
+        # referer: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Location
+        #   303 - all change to GET
+        #   307 & 308 - all do not change
+        #   301 & 302 - most of the time do not change?
+        # referer: https://fetch.spec.whatwg.org/#http-redirect-fetch
+        #   one of the following is true, change to GET (except HEAD)
+        #       - 301/302 and method=POST
+        #       - 303 and method is not GET or HEAD
+        method = origin_method
+        if (status_code == 303 and method != "HEAD") or (status_code in [301, 302] and method == "POST"):
+            method = "GET"
+        if method == "POST":
             c.setopt(c.POST, 1)
-        elif origin_method == "GET":
+        elif method == "GET":
             c.setopt(c.HTTPGET, 1)
-        elif origin_method == "HEAD":
+        elif method == "HEAD":
             c.setopt(c.NOBODY, 1)
         else:
             # put, patch, and other method
-            c.setopt(c.CUSTOMREQUEST, origin_method)
+            c.setopt(c.CUSTOMREQUEST, method)
         c.buffer.seek(0)
         c.buffer.truncate()
         c.header_handle.clear()
