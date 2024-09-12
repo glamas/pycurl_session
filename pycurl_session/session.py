@@ -553,7 +553,7 @@ class Session(object):
 
     def _response_redirect(self, c, logger_handle=None):
         origin_url = c.request["url"]
-        origin_method = c.request["method"]
+        origin_method = c.request["method"].upper()
 
         for header in c.response_headers:
             if "location:" in header.lower():
@@ -605,15 +605,15 @@ class Session(object):
                 break
         # update curl
         c.setopt(c.REFERER, origin_url)
-        if origin_method.lower() == "post":
+        if origin_method == "POST":
             c.setopt(c.POST, 1)
-        elif origin_method.lower() == "get":
+        elif origin_method == "GET":
             c.setopt(c.HTTPGET, 1)
-        elif origin_method.lower() == "head":
+        elif origin_method == "HEAD":
             c.setopt(c.NOBODY, 1)
         else:
             # put, patch, and other method
-            c.setopt(c.CUSTOMREQUEST, origin_method.upper())
+            c.setopt(c.CUSTOMREQUEST, origin_method)
         c.buffer.seek(0)
         c.buffer.truncate()
         c.header_handle.clear()
