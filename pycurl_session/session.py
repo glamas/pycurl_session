@@ -361,8 +361,9 @@ class Session(object):
         # for get:
         #   params accept dict or raw_str
         json_data = json
-        c.request.update({"method": method.upper()})
-        if method.lower() == "post":
+        method = method.upper()
+        c.request.update({"method": method})
+        if method == "POST":
             c.setopt(c.POST, 1)
             if multipart or files is not None:
                 # Multipart/form-data
@@ -443,14 +444,11 @@ class Session(object):
                 c.setopt(c.POSTFIELDS, post_data)
             else:
                 c.setopt(c.POSTFIELDS, "")
-        elif method.lower() == "put" or method.lower() == "patch":
+        elif method == "PUT" or method == "PATCH":
+            c.setopt(c.CUSTOMREQUEST, method)
             # application/json
             if "content-type" not in request_headers:
                 request_headers.update({"content-type": "application/json"})
-            if method.lower() == "patch":
-                c.setopt(c.CUSTOMREQUEST, "PATCH")
-            if method.lower() == "put":
-                c.setopt(c.CUSTOMREQUEST, "PUT")
             # files > json_data > data, only one will use
             if files is not None and isinstance(files, str):
                 with open(files) as f:
@@ -464,12 +462,12 @@ class Session(object):
             else:
                 data_body = m_json.dumps(data) if isinstance(data, dict) else data
                 c.setopt(c.POSTFIELDS, data_body)
-        elif method.lower() == "get":
+        elif method == "GET":
             c.setopt(c.HTTPGET, 1)
-        elif method.lower() == "head":
+        elif method == "HEAD":
             c.setopt(c.NOBODY, 1)
         else:
-            c.setopt(c.CUSTOMREQUEST, method.upper())
+            c.setopt(c.CUSTOMREQUEST, method)
 
         c.request.update({"headers": request_headers})
         headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
