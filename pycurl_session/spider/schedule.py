@@ -724,9 +724,9 @@ class Schedule(object):
                 if to_update_cm == True:
                     to_update_cm = False
                     self.logger.info(
-                        "KeyboardInterrupt raised."
-                        "No more new request will be added to queue."
-                        "You can send CTRL-c again to shut down schedule."
+                        "KeyboardInterrupt raised. "
+                        "No more new request will be added to queue. "
+                        "You can send CTRL-c again to shut down schedule. "
                         "Or wait for request done."
                     )
                     continue
