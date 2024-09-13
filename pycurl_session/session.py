@@ -52,24 +52,28 @@ class Session(object):
         self.cookie_db = CacheDB(self.cookie_db_path)
 
         self.c = pycurl.Curl()
+        self.version_info = pycurl.version_info()
+
+        # direct set
+        self.headers = {}
         self.auth = {}
         self.proxy = {}
+        self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
+        self.redirect_http_codes = [301, 302, 303, 307, 308]
 
-        self.headers = {}
-        self.useragent = ""
-        # self.response_headers = []
-        self.history = []
+        # set by function
         self._max_retry_times = 3
         self._retry_interval = 5
         self._backoff = [self._retry_interval]
-        self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
-        self.redirect_http_codes = [301, 302, 303, 307, 308]
         self._timeout = 30
 
-        self._fh = None
+        # advance set
         self._ssl_cipher_list = None # "ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH"
-        self.version_info = pycurl.version_info()
         self._verify = True
+        self._verbose = False
+
+        # private
+        self._fh = None
 
     def set_cookie_db(self, cookie_db_path):
         dir_path = os.path.dirname(cookie_db_path)
@@ -259,10 +263,8 @@ class Session(object):
         self.init_curl_var(c)
         c.session_id = session_id if session_id else None
 
-        self._set_proxy(c, proxy)
-        self._set_verbose(c, verbose)
-
         # common setting
+        c.setopt(c.VERBOSE, 1 if self._verbose or verbose else 0)
         c.allow_redirects = allow_redirects
         c.setopt(c.FOLLOWLOCATION, 0)
         if not timeout:
@@ -277,12 +279,7 @@ class Session(object):
         c.setopt(c.HEADERFUNCTION, c.header_handle.write)
         c.setopt(c.WRITEDATA, c.buffer)
 
-        # if len(self.history) > 0 and request_referer == None:
-        #     request_referer = self.history[-1]
-        #     c.setopt(c.REFERER, self.history[-1])
-        # if request_referer:
-        #     c.setopt(c.REFERER, request_referer)
-        # c.request.update({"referer": request_referer})
+        self._set_proxy(c, proxy)
 
         # reconstruct url
         url_info = urlparse(url)
@@ -480,7 +477,6 @@ class Session(object):
         response.headers = c.response_headers
         response.content = c.buffer
         response.url = c.getinfo(pycurl.EFFECTIVE_URL)
-        # self.history.append(response.url)
         response.request.update(
             {
                 "url": c.request["url"],
@@ -745,11 +741,6 @@ class Session(object):
                     "{0}:{1}".format(proxy_info["username"], proxy_info["password"]),
                 )
 
-    def _set_verbose(self, c, verbose):
-        if verbose:
-            c.setopt(c.VERBOSE, 1)
-        else:
-            c.setopt(c.VERBOSE, 0)
 
     def _response_decode(self, response):
         content_type = ""
