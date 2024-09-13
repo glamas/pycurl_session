@@ -497,7 +497,7 @@ class Schedule(object):
                 and response.meta["dont_redirect"] != True
             )
         ):
-            self.session._response_redirect(c, logger_handle=self.logger)
+            self.session._response_redirect(c, response.status_code, logger_handle=self.logger)
             if self.settings["ROBOTSTXT_OBEY"]:
                 # check new url top_domain if robotstxt check enabled
                 old_top_domain = c.top_domain
