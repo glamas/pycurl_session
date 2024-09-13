@@ -4,7 +4,7 @@
 本项目没有发布到pypi等分发平台。  
 
 ## 依赖
-- pycurl -- 主要。windows的第三方编译版本可以从[这里下载](https://www.lfd.uci.edu/~gohlke/pythonlibs/#pycurl)
+- pycurl -- 主要
 - lxml -- 通过xpath解析html内容
 - cssselect -- 通过css解析html内容
 - certifi -- ssl获取证书位置
