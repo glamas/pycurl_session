@@ -127,6 +127,7 @@ CREATE TABLE cookie (
             "VALUES(?, ?, ?, ?, ?, ?)"
         )
         res = self.executemany(sql, params)
+        self.conn.commit()
         if res: res.close()
 
     def delete_cookies(self, params):
@@ -134,12 +135,14 @@ CREATE TABLE cookie (
             "DELETE FROM cookie WHERE session_id=? and name=? and domain=? and path=?"
         )
         res = self.executemany(sql, params)
+        self.conn.commit()
         if res: res.close()
 
     def clear_cookies(self, session_id=None):
         if session_id:
             sql = "DELETE FROM cookie WHERE session_id=?"
             res = self.execute(sql, (session_id,))
+            self.conn.commit()
             if res: res.close()
 
     def unset_cookies(self, session_id, cookies=None):

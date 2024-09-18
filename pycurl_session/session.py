@@ -790,6 +790,32 @@ class Session(object):
             response.text = ""
             response.encoding = "unkown"
 
+    def init_cookies(self, domain, cookies=None, session_id=None):
+        if not session_id:
+            session_id = self.session_id
+        params = []
+        if isinstance(cookies, str):
+            for item in cookies.split(";"):
+                item = item.strip()
+                name, value = item.split("=", 1)
+                name = name.strip()
+                value = value.strip()
+                params.append((session_id, name, value, domain, "/", ""))
+        elif isinstance(cookies, dict):
+            for name, value in cookies.items():
+                params.append((session_id, name, value, domain, "/", ""))
+        elif isinstance(cookies, list):
+            for item in cookies:
+                if isinstance(item, dict):
+                    name = item.get("name")
+                    value = item.get("value")
+                    if name is not None and value is not None:
+                        expire = item.get("expirationDate")
+                        if expire: expire = int(expire)
+                        params.append((session_id, name, value, item.get("domain") or domain, item.get("path", "/"), expire))
+        if len(params):
+            self.cookie_db.save_cookies(params)
+
     def save_cookies(self, response, session_id=None):
         if not session_id:
             session_id = self.session_id
