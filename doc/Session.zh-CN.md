@@ -47,6 +47,12 @@ set_proxy(proxy)
     Parameters:  
         - proxy(str) - 设置Session代理  
 
+init_cookies(domain, cookies, session_id=None)  
+    Parameters:  
+        - domain(str) - 指定cookies的domain  
+        - cookies(str|list|dict) - cookies内容  
+        - session_id(str) - 用来标识cookie  
+
 prepare_curl_handle(method, url, c=None,  
         headers=None, cookies=None, auth=None, proxy=None, cert=None,  
         params=None, data=None, json=None, files=None, multipart=False,  
