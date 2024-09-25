@@ -11,6 +11,7 @@ DEFAULT_HEADERS = {
     "accept-encoding": "gzip, deflate",
     "accept-language": "en",
 }
+SIMULATE_FETCH = False
 
 ## robots.txt
 ROBOTSTXT_OBEY = True

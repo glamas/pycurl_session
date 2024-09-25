@@ -60,6 +60,7 @@ class Session(object):
         self.proxy = {}
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
         self.redirect_http_codes = [301, 302, 303, 307, 308]
+        self.simulate_fetch = False
 
         # set by function
         self._max_retry_times = 3
@@ -466,6 +467,8 @@ class Session(object):
         else:
             c.setopt(c.CUSTOMREQUEST, method)
 
+        if self.simulate_fetch:
+            self._add_fetch_header(request_headers, url, method)
         c.request.update({"headers": request_headers})
         headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
         c.setopt(c.HTTPHEADER, headers_list)
@@ -551,6 +554,45 @@ class Session(object):
         origin_url = c.request["url"]
         origin_method = c.request["method"].upper()
 
+        if logger_handle:
+            status_code = c.getinfo(pycurl.RESPONSE_CODE)
+            perform_time = c.getinfo(pycurl.TOTAL_TIME)
+            logger_handle.info(
+                "({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})".format(
+                    status_code,
+                    c.request["url"],
+                    origin_method,
+                    origin_url,
+                    perform_time,
+                    c.request["referer"],
+                )
+            )
+
+        # c.setopt(c.REFERER, origin_url)
+        # update method
+        # for 3xx, update method
+        # referer: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Location
+        #   303 - all change to GET
+        #   307 & 308 - all do not change
+        #   301 & 302 - most of the time do not change?
+        # referer: https://fetch.spec.whatwg.org/#http-redirect-fetch
+        #   one of the following is true, change to GET (except HEAD)
+        #       - 301/302 and method=POST
+        #       - 303 and method is not GET or HEAD
+        method = origin_method
+        if (status_code == 303 and method != "HEAD") or (status_code in [301, 302] and method == "POST"):
+            method = "GET"
+        if method == "POST":
+            c.setopt(c.POST, 1)
+        elif method == "GET":
+            c.setopt(c.HTTPGET, 1)
+        elif method == "HEAD":
+            c.setopt(c.NOBODY, 1)
+        else:
+            # put, patch, and other method
+            c.setopt(c.CUSTOMREQUEST, method)
+
+        # check and update headers
         for header in c.response_headers:
             if "location:" in header.lower():
                 url = header.split(":", 1)[1].strip()
@@ -595,51 +637,19 @@ class Session(object):
                     request_headers.update({"cookie": cookie_str})
                     c.setopt(pycurl.COOKIE, cookie_str)
                 # reset header
+                if self.simulate_fetch:
+                    self._add_fetch_header(request_headers, url, method)
                 c.request.update({"headers": request_headers})
                 headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
                 c.setopt(c.HTTPHEADER, headers_list)
                 break
-        # update curl
-        c.setopt(c.REFERER, origin_url)
-        # for 3xx, update method
-        # referer: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Location
-        #   303 - all change to GET
-        #   307 & 308 - all do not change
-        #   301 & 302 - most of the time do not change?
-        # referer: https://fetch.spec.whatwg.org/#http-redirect-fetch
-        #   one of the following is true, change to GET (except HEAD)
-        #       - 301/302 and method=POST
-        #       - 303 and method is not GET or HEAD
-        method = origin_method
-        if (status_code == 303 and method != "HEAD") or (status_code in [301, 302] and method == "POST"):
-            method = "GET"
-        if method == "POST":
-            c.setopt(c.POST, 1)
-        elif method == "GET":
-            c.setopt(c.HTTPGET, 1)
-        elif method == "HEAD":
-            c.setopt(c.NOBODY, 1)
-        else:
-            # put, patch, and other method
-            c.setopt(c.CUSTOMREQUEST, method)
+
+        # reset var
         c.buffer.seek(0)
         c.buffer.truncate()
         c.header_handle.clear()
         c.response_headers.clear()
 
-        if logger_handle:
-            status_code = c.getinfo(pycurl.RESPONSE_CODE)
-            perform_time = c.getinfo(pycurl.TOTAL_TIME)
-            logger_handle.info(
-                "({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})".format(
-                    status_code,
-                    c.request["url"],
-                    origin_method,
-                    origin_url,
-                    perform_time,
-                    c.request["referer"],
-                )
-            )
 
     def _response_retry(self, c, logger_handle=None):
         c.retry += 1
@@ -789,6 +799,76 @@ class Session(object):
         if charset_decode == False:
             response.text = ""
             response.encoding = "unkown"
+
+
+    def _is_cors(self, url, headers):
+        if headers and isinstance(headers, dict):
+            if "referer" in headers:
+                url_info = urlparse(url)
+                referer_url = headers["referer"]
+                referer_url_info = urlparse(referer_url)
+                if (referer_url_info.scheme != url_info.scheme
+                    or referer_url_info.hostname != url_info.hostname
+                    or referer_url_info.port != url_info.port
+                ):
+                    return True
+            if ("sec-fetch-mode" in headers
+                and isinstance(headers["sec-fetch-mode"], str)
+                and headers["sec-fetch-mode"].strip().lower() == "cors"
+            ):
+                return True
+        return False
+
+
+    def _add_fetch_header(self, headers, url, method="GET"):
+        # https://fetch.spec.whatwg.org/
+        # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers
+        # https://developer.mozilla.org/en-US/docs/Glossary/Fetch_metadata_request_header
+        # CORS-safelisted request header:
+        #   Accept, Accept-Language
+        # Fetch metadata request header:
+        #   Sec-Fetch-Site, Sec-Fetch-Mode, Sec-Fetch-User, Sec-Fetch-Dest
+        # Ohter:
+        #   Cache-Control, User-Agent, Origin
+        is_cors = self._is_cors(url, headers)
+        if "cache-control" not in headers:
+            headers.update({"cache-control": "no-cache"})
+        if "accept" not in headers:
+            headers.update({"accept": "text/html, application/xhtml+xml, application/xml;q=0.9, image/webp, */*;q=0.8"})
+        if "accept-language" not in headers:
+            headers.update({"accept-language": "en"})
+        if "origin" not in headers:
+            url_info = urlparse(url)
+            if (url_info.scheme == "http" and url_info.port != 80) or (url_info.scheme == "https" and url_info.port != 443):
+                origin_url = "{0}://{1}:{2}".format(url_info.scheme, url_info.hostname, url_info.port)
+            else:
+                origin_url = "{0}://{1}".format(url_info.scheme, url_info.hostname)
+            # https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Origin
+            # 
+            if method in ["POST", "PUT", "PATCH", "DELETE"]:
+                headers.update({"origin": origin_url})
+            elif is_cors:
+                headers.update({"origin": origin_url})
+        if "user-agent" not in headers:
+            # pass    # do nothing
+            headers.update({"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"})
+        # Fetch metadata
+        if is_cors:
+            if "sec-fetch-mode" not in headers:
+                headers.update({"sec-fetch-mode": "cors"})
+            if "sec-fetch-site" not in headers:
+                headers.update({"sec-fetch-site": "cross-site"})
+        else:
+            if "sec-fetch-mode" not in headers:
+                headers.update({"sec-fetch-mode": "same-origin" if "referer" in headers else "navigate"})
+            if "sec-fetch-site" not in headers:
+                headers.update({"sec-fetch-site": "same-origin" if "referer" in headers else "none"})
+        if "sec-fetch-mode" in headers:
+            if "sec-fetch-user" not in headers:
+                headers.update({"sec-fetch-user": "?1"})    # user click
+            if "sec-fetch-dest" not in headers:
+                headers.update({"sec-fetch-dest": "document"})      # always top-level
+
 
     def init_cookies(self, domain, cookies=None, session_id=None):
         if not session_id:

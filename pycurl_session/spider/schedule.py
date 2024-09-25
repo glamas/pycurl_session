@@ -39,6 +39,8 @@ class Schedule(object):
 
         self.session = Session(self.settings["BOT"], self.settings["COOKIES_STORE_ENABLED"])
         self.session.headers.update(self.settings["DEFAULT_HEADERS"])
+        if self.settings["SIMULATE_FETCH"]:
+            self.session.simulate_fetch = True
         self.session.set_timeout(self.settings["DOWNLOAD_TIMEOUT"])
         if self.settings["COOKIES_STORE_ENABLED"] and self.settings["COOKIES_STORE_DB"]:
             self.session.set_cookie_db(self.settings["COOKIES_STORE_DB"])
