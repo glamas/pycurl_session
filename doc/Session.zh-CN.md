@@ -12,6 +12,9 @@
 ```python
 from pycurl_session import Session
 
+s = Session()
+s.headers.update({"user-agent": "curl"})
+# s.simulate_fetch = True
 r = s.get(url="https://github.com")
 r = r.submit_form(method="get", formdata={"q": "pycurl"})
 url = r.xpath('//ul[contains(@class, "repo-list")]/li//a/@href').get()
@@ -98,10 +101,14 @@ def get(self, url, **args):
     return response
 ```
 
+Session 属性  
 c - pycurl.Curl()实例  
 headers - (dict) session默认headers  
 retry_http_codes - (list) 默认：[500, 502, 503, 504, 522, 524, 408, 429]  
-_ssl_cipher_list - (str) SSL_CIPHER_LIST设置，默认："ALL:!EXPORT:!EXPORT40:!EXPORT56:!aNULL:!LOW:!RC4:@STRENGTH"  
+redirect_http_codes - (list) 默认：[301, 302, 303, 307, 308]  
+simulate_fetch - (bool) 部分模拟fetch请求，自动添加一些header，比如Accept，Cache-Control，Sec-Fetch-Mode，User-Agent，Origin  
+_ssl_cipher_list - (str) SSL_CIPHER_LIST设置，默认：None  
+
 
 class pycurl_session.Response(session)  
     Parameters:  
@@ -169,6 +176,7 @@ save(path)
     Parameters:  
         - path(str) - 指定相应保存的路径(按二进制保存)  
 
+Response 属性  
 headers - (list) 相应返回的headers  
 url - (str) 请求的url。如果有跳转，最后一次请求的url  
 status_code - (int) 响应状态码  

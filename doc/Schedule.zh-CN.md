@@ -61,6 +61,7 @@ from pycurl_session.spider.schedule.Schedule(custom_settings={})
             - DOWNLOADER_MIDDLEWARES - (list) 下载中间件  
             - ITEM_PIPELINES - (list) Item管道  
             - DEPTH_PRIORITY - 是否深度优先。默认是  
+            - SIMULATE_FETCH - 是否模拟fetch请求，自动添加一些header。默认否  
 
 add_spider(spider, task_provider=Task, \*\*arg)  
     Parameters:  

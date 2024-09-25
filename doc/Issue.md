@@ -13,3 +13,5 @@ RobotsTxt 虽然是一个下载中间件，但不参与下载中间件的管道�
 CurlMulti的select()设置为0.001，不可调。是为了避免重定向或者超时时，主循环cpu占用过高
 
 下载中间件管道循环，按DOWNLOADER_MIDDLEWARES的顺序执行process_request，逆序执行process_response和process_exception。
+
+模拟fetch请求，自动添加一些header属性，不完全正确。
