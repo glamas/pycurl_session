@@ -17,7 +17,7 @@ class Response(object):
         self.text = ""
         self.content_type = ""
         self.encoding = None
-        self.cookies = {}
+        self.cookies = Cookies()
         self.request = {}
         self.meta = {}
         self.session = session
@@ -315,3 +315,66 @@ class Selector(object):
             for sel in self.lst:
                 ret.append(sel.re(compiled=compiled, all=all))
             return ret
+
+
+class CookieItem:
+    def __init__(self, name, value, domain, path, expires) -> None:
+        self.name = name
+        self.value = value
+        self.domain = domain
+        self.path = path
+        self.expires = expires
+
+    def __getitem__(self, name):
+        return getattr(self, name) if hasattr(self, name) else None
+
+    def __repr__(self):
+        return "CookieItem(name='{0}', value='{1}', domain='{2}', path='{3}', expires={4})".format(
+            self.name, self.value, self.domain, self.path, self.expires
+        )
+
+
+class Cookies:
+    def __init__(self) -> None:
+        self.data = []
+
+    def clear(self):
+        self.data.clear()
+
+    def set_cookie(self, name, value, domain, path, expires):
+        self.data.append(CookieItem(name, value, domain, path, expires))
+
+    def get_value(self, name, default=None, domain=None, path=None):
+        for cookie in self.data:
+            if cookie.name != name:
+                continue
+            if domain and cookie.domain != domain:
+                continue
+            if path and cookie.path != path:
+                continue
+            return cookie.value
+        return default
+
+    def __getitem__(self, name):
+        return self.get_value(name)
+
+    def __getattr__(self, name):
+        return self.get_value(name)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __iter__(self):
+        self.i = 0
+        self.max = len(self)
+        return self
+
+    def __next__(self):
+        if self.i < self.max:
+            item = self.data[self.i]
+            self.i += 1
+            return item
+        raise StopIteration
+
+    def __repr__(self):
+        return json.dumps([str(item) for item in self.data])

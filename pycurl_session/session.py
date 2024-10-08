@@ -899,7 +899,8 @@ class Session(object):
     def save_cookies(self, response, session_id=None):
         if not session_id:
             session_id = self.session_id
-        response.cookies = {}
+        default_domain = urlparse(response.url).hostname
+        response.cookies.clear()
         params = []
         params_del = []
         for item in response.headers:
@@ -954,13 +955,14 @@ class Session(object):
                             name = kv_split[0].strip()
                             value = kv_split[1].strip()
                 if domain == "":
-                    domain = urlparse(response.url).hostname
-                params.append((session_id, name, value, domain, path, expires))
-                if name not in response.cookies:
-                    response.cookies.update({name: value})
-                response.cookies.update({name: value})
-                if value in ["delete"]:  # value = 'delete': delete this cookie
-                    params_del.append((session_id, name, domain, path))
+                    domain = default_domain
+                # only same domain or high domain
+                high_domain = domain[1:] if domain and domain[0] == "." else domain
+                if default_domain.endswith(high_domain):
+                    params.append((session_id, name, value, domain, path, expires))
+                    response.cookies.set_cookie(name, value, domain, path, expires)
+                    if value in ["delete"]:  # value = 'delete': delete this cookie
+                        params_del.append((session_id, name, domain, path))
 
         if len(params):
             self.cookie_db.save_cookies(params)
