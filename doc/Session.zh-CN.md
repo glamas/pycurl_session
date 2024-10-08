@@ -184,7 +184,7 @@ content - (BytesIO) 返回的body数据
 text - (str) 返回的body数据  
 content_type - (str) body数据的网页格式，不完全准确  
 encoding - (str) body数据的编码，不完全准确  
-cookies - (dict) 返回的cookie  
+cookies - (Cookies) 返回的cookie，只读  
 request - (dict) 请求内容，包括method, url, referer, cookies, headers  
 meta - (dict) 用于Spider Request请求传递数据  
 session - (str) Session实例  
@@ -224,6 +224,30 @@ re(pattern="", compiled=None, flags=re.I, all=False)
         - all - 是否只返回第一个group的数据，默认False，返回字符串，如果是True，返回的列表  
     Return:  
         - list - 由参数all决定内部元素是字符串还是列表，如果all=True，每个元素都是列表  
+
+
+class pycurl_session.response.Cookies()  
+    Parameters:  
+        只读
+
+get_value(self, name, default=None, domain=None, path=None)  
+    Parameters:  
+        - name - cookie name  
+        - default - default value if not found  
+        - domain - filter domain if has multi cookie with same name  
+        - path - filter path if has multi cookie with same name  
+    Return:  
+        - str - cookie value  
+
+```python
+r = s.get(url)
+print(r.cookies)
+print(r.cookies["cookie_key"])      # or r.cookies.cookie_key, return first if has multi cookie with same name
+print(r.cookies.get_value("cookie_key"))
+for cookie in r.cookies:
+    print(cookie)           # e.g. CookieItem(name='x', value='y', domain='.example.com', path='/', expires=None)
+    print(cookie.name)      # or cookie["name"]
+```
 
 
 ## 扩展
