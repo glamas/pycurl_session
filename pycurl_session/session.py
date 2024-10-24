@@ -839,7 +839,10 @@ class Session(object):
             headers.update({"accept-language": "en"})
         if "origin" not in headers:
             url_info = urlparse(url)
-            if (url_info.scheme == "http" and url_info.port != 80) or (url_info.scheme == "https" and url_info.port != 443):
+            if (url_info.port
+                and ((url_info.scheme == "http" and url_info.port != 80)
+                    or (url_info.scheme == "https" and url_info.port != 443))
+                ):
                 origin_url = "{0}://{1}:{2}".format(url_info.scheme, url_info.hostname, url_info.port)
             else:
                 origin_url = "{0}://{1}".format(url_info.scheme, url_info.hostname)
