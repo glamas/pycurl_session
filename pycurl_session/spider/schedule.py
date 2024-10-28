@@ -688,7 +688,13 @@ class Schedule(object):
         self.logger.info("Spider started")
         # ========== schedule info end ==========
         # ========== main loop start ==========
-        gc_time = time.time()
+        init_time = time.time()
+        gc_time = init_time
+        per_min_time = init_time
+        per_min_item_total = 0
+        per_min_page = 0
+        per_min_page_total = 0
+
         loop_init = True
         to_update_cm = True
         running_handles = 0
@@ -699,15 +705,31 @@ class Schedule(object):
                     ret, self.num_handles = self.cm.perform()
                     if ret != pycurl.E_CALL_MULTI_PERFORM or self.num_handles == 0:
                         break
-                self.cm.select(0.001)
+                self.cm.select(0.01)
+
+                if time.time() - per_min_time > 60:
+                    per_min_time = time.time()
+                    per_min_page_total += per_min_page
+                    self.logger.info("Crawled {0} pages and handle {2} items (last minute {1} pages and {3} items), passed {4} minites".format(
+                        per_min_page_total,
+                        per_min_page,
+                        per_min_item_total,
+                        per_min_item_total - self.logstat.get("item_pipeline/count", 0),
+                        int((per_min_time - init_time) / 60)
+                    ))
+                    per_min_item_total = self.logstat.get("item_pipeline/count", 0)
+                    per_min_page = 0
+
                 if running_handles != self.num_handles:
                     running_handles = self.num_handles
                     num_q, ok_list, err_list = self.cm.info_read()
                     for c in ok_list:
                         self.process_curl_multi_ok(c)
+                        per_min_page += 1
 
                     for c, errno, errmsg in err_list:
                         self.process_curl_multi_err(c, errno, errmsg)
+                        per_min_page += 1
 
                     if time.time() - gc_time > 60:
                         gc_time = time.time()
