@@ -15,7 +15,7 @@ from inspect import isgenerator
 from urllib.parse import urlparse
 
 import pycurl
-from pycurl_session import Session
+from pycurl_session import Session, ColoredConsoleHandler
 from pycurl_session.response import Response
 from pycurl_session.spider import settings
 from pycurl_session.spider.exceptions import IgnoreRequest, DropItem, CloseSpider, PerformError, RetryRequest
@@ -97,7 +97,7 @@ class Schedule(object):
                 self.settings["LOG_FORMAT"], datefmt="%Y-%m-%d %H:%M:%S",
             )
             logger.setLevel(logging.DEBUG)
-            ch = logging.StreamHandler()
+            ch = ColoredConsoleHandler()
             ch.setFormatter(formatter)
             ch.setLevel(logging.DEBUG)
             logger.addHandler(ch)

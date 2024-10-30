@@ -1,5 +1,6 @@
 # coding: utf-8
 
+from pycurl_session import ColoredConsoleHandler
 from pycurl_session.spider.request import Request
 
 import logging
@@ -26,7 +27,7 @@ class Spider(object):
                 log_format = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
             logger.setLevel(logging.DEBUG)
             formatter = logging.Formatter(log_format, datefmt="%Y-%m-%d %H:%M:%S")
-            ch = logging.StreamHandler()
+            ch = ColoredConsoleHandler()
             ch.setFormatter(formatter)
             ch.setLevel(logging.DEBUG)
             logger.addHandler(ch)
