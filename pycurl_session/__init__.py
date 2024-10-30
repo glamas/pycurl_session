@@ -88,10 +88,10 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 reset=c_reset, method=c_method, time=c_time, url=c_url,
                 code=self.get_code_colour(m.group(1)),
             )
-        # Crawled {0} pages and handle {2} items (last minute {1} pages and {3} items), passed {4} minites
+        # Crawled {0} pages and handle {1} items (last minute {2} pages and {3} items), passed {4} minites
         m = re.match("Crawled (\d+) pages and handle (\d+) items \(last minute (\d+) pages and (\d+) items\), passed (\d+) minites", msg)
         if m and m.group(1):
-            return "{reset}Crawled {times}{0}{reset} pages and handle {times}{2}{reset} items (last minute {times}{1}{reset} pages and {times}{3}{reset} items), passed {times}{4}{reset} minites".format(
+            return "{reset}Crawled {times}{0}{reset} pages and handle {times}{1}{reset} items (last minute {times}{2}{reset} pages and {times}{3}{reset} items), passed {times}{4}{reset} minites".format(
                 m.group(1), m.group(2), m.group(3), m.group(4), m.group(5),
                 reset=c_reset, times=c_times,
             )

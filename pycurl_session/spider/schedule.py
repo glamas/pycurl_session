@@ -691,6 +691,7 @@ class Schedule(object):
         init_time = time.time()
         gc_time = init_time
         per_min_time = init_time
+        per_min_item_last = 0
         per_min_item_total = 0
         per_min_page = 0
         per_min_page_total = 0
@@ -707,17 +708,18 @@ class Schedule(object):
                         break
                 self.cm.select(0.01)
 
-                if time.time() - per_min_time > 60:
+                if time.time() - per_min_time > 10:
                     per_min_time = time.time()
                     per_min_page_total += per_min_page
+                    per_min_item_total = self.logstat.get("item_pipeline/count", 0)
                     self.logger.info("Crawled {0} pages and handle {1} items (last minute {2} pages and {3} items), passed {4} minites".format(
                         per_min_page_total,
                         per_min_item_total,
                         per_min_page,
-                        self.logstat.get("item_pipeline/count", 0) - per_min_item_total,
+                        per_min_item_total - per_min_item_last,
                         int((per_min_time - init_time) / 60)
                     ))
-                    per_min_item_total = self.logstat.get("item_pipeline/count", 0)
+                    per_min_item_last = per_min_item_total
                     per_min_page = 0
 
                 if running_handles != self.num_handles:
