@@ -38,7 +38,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
 
     def format(self, record):
         if self.stream == sys.stderr or self.stream == sys.stdout:
-            if not hasattr(self, "color_formatter"):
+            if not hasattr(self, "colorformatter"):
                 self.colorformatter = ColorFormatter(self.formatter._fmt, datefmt=self.formatter.datefmt)
                 if hasattr(self.formatter, "_style"):
                     self.colorformatter._style = self.formatter._style
