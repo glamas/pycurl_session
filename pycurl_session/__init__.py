@@ -123,6 +123,14 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 m.group(1), m.group(2),
                 reset=c_reset, method=c_method, times=c_times, url=c_url,
             )
+        # Timeout/Error ({0}, {1}) when <{2} {3}>
+        m = re.match("(Timeout|Error) \((.*?), (.*)\) when <(.*?) (.*)>", msg)
+        if m and m.group(1):
+            color = self.ANSI_M_YELLOW if m.group(1) == "Timeout" else self.ANSI_M_RED
+            return "{reset}{color}{error}{reset} ({times}{0}{reset}, {1}) when <{method}{2}{reset} {url}{3}{reset}>".format(
+                m.group(2), m.group(3), m.group(4), m.group(5), error=m.group(1),
+                reset=c_reset, method=c_method, times=c_times, url=c_url, color=color,
+            )
         return str(msg)
 
 log_format = "%(asctime)s %(levelname)s [%(module)s] %(message)s"
