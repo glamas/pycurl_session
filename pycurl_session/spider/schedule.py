@@ -710,11 +710,11 @@ class Schedule(object):
                 if time.time() - per_min_time > 60:
                     per_min_time = time.time()
                     per_min_page_total += per_min_page
-                    self.logger.info("Crawled {0} pages and handle {2} items (last minute {1} pages and {3} items), passed {4} minites".format(
+                    self.logger.info("Crawled {0} pages and handle {1} items (last minute {2} pages and {3} items), passed {4} minites".format(
                         per_min_page_total,
-                        per_min_page,
                         per_min_item_total,
-                        per_min_item_total - self.logstat.get("item_pipeline/count", 0),
+                        per_min_page,
+                        self.logstat.get("item_pipeline/count", 0) - per_min_item_total,
                         int((per_min_time - init_time) / 60)
                     ))
                     per_min_item_total = self.logstat.get("item_pipeline/count", 0)
