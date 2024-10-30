@@ -708,7 +708,7 @@ class Schedule(object):
                         break
                 self.cm.select(0.01)
 
-                if time.time() - per_min_time > 10:
+                if time.time() - per_min_time > 60:
                     per_min_time = time.time()
                     per_min_page_total += per_min_page
                     per_min_item_total = self.logstat.get("item_pipeline/count", 0)
