@@ -1,15 +1,26 @@
 # coding: utf-8
 
-import os
+import os, sys
 import copy
 import logging
 import re
+import time
 import platform
 
 
 if platform.system() == 'Windows':
     # On windows, run this first, enable ANSI codes
     os.system('color')
+
+
+class ColorFormatter(logging.Formatter):
+    def __init__(self, *args, **kwargs):
+        # can't do super(...) here because Formatter is an old school class
+        logging.Formatter.__init__(self, *args, **kwargs)
+    
+    def formatTime(self, record, datefmt):
+        return "\x1b[36m" + time.strftime(datefmt) + "\x1b[0m"
+
 
 class ColoredConsoleHandler(logging.StreamHandler):
     # \x1b[ or \033 - call function, 31 - function arguments, m - funtion name
@@ -21,16 +32,26 @@ class ColoredConsoleHandler(logging.StreamHandler):
     ANSI_M_GREEN = "\x1b[32m"
     ANSI_M_YELLOW = "\x1b[33m"
     ANSI_M_BLUE = "\x1b[34m"
-    ANSI_M_MAGENTA = "\x1b[35m"     # pink
+    ANSI_M_MAGENTA = "\x1b[35m"
     ANSI_M_CYAN = "\x1b[36m"
     ANSI_M_WHITE = "\x1b[37m"
+
+    def format(self, record):
+        if self.stream == sys.stderr or self.stream == sys.stdout:
+            if not hasattr(self, "color_formatter"):
+                self.colorformatter = ColorFormatter(self.formatter._fmt, datefmt=self.formatter.datefmt)
+                if hasattr(self.formatter, "_style"):
+                    self.colorformatter._style = self.formatter._style
+            return self.colorformatter.format(record)
+        else:
+            return self.formatter.format(record)
 
     def emit(self, record):
         # Need to make a actual copy of the record
         # to prevent altering the message for other loggers
         myrecord = copy.copy(record)
         # if setStream() to other output, no colour
-        if "stderr" in self.stream.name:
+        if self.stream == sys.stderr or self.stream == sys.stdout:
             levelno = myrecord.levelno
             if(levelno >= 50):  # CRITICAL / FATAL
                 color = self.ANSI_M_RED
@@ -133,9 +154,9 @@ class ColoredConsoleHandler(logging.StreamHandler):
             )
         return str(msg)
 
+
 log_format = "%(asctime)s %(levelname)s [%(module)s] %(message)s"
 
-# logging.basicConfig(format='%(asctime)s [%(module)s] %(levelname)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger("pycurl_session")
 if len(logger.handlers) == 0:
     logger.setLevel(logging.DEBUG)
