@@ -218,7 +218,7 @@ class Session(object):
             for pair in query.split("&"):
                 kv = pair.split("=", 1)
                 if len(kv) == 2:
-                    _tmp.append(tuple(kv))
+                    _tmp.append((kv[0], unquote(kv[1])))
                 else:
                     _tmp.append((kv, ""))
             query = urlencode(_tmp, safe=quote_safe)
