@@ -553,20 +553,8 @@ class Session(object):
     def _response_redirect(self, c, status_code, logger_handle=None):
         origin_url = c.request["url"]
         origin_method = c.request["method"].upper()
-
-        if logger_handle:
-            status_code = c.getinfo(pycurl.RESPONSE_CODE)
-            perform_time = c.getinfo(pycurl.TOTAL_TIME)
-            logger_handle.info(
-                "({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})".format(
-                    status_code,
-                    c.request["url"],
-                    origin_method,
-                    origin_url,
-                    perform_time,
-                    c.request["referer"],
-                )
-            )
+        status_code = c.getinfo(pycurl.RESPONSE_CODE)
+        perform_time = c.getinfo(pycurl.TOTAL_TIME)
 
         # c.setopt(c.REFERER, origin_url)
         # update method
@@ -643,6 +631,18 @@ class Session(object):
                 headers_list = ["{0}: {1}".format("-".join(x.capitalize() for x in k.split("-")), v) for k, v in request_headers.items()]
                 c.setopt(c.HTTPHEADER, headers_list)
                 break
+
+        if logger_handle:
+            logger_handle.info(
+                "({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})".format(
+                    status_code,
+                    c.request["url"],
+                    origin_method,
+                    origin_url,
+                    perform_time,
+                    c.request["referer"],
+                )
+            )
 
         # reset var
         c.buffer.seek(0)
