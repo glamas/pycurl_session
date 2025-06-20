@@ -430,7 +430,16 @@ class Schedule(object):
                     > self.settings["DOWNLOAD_DELAY"]
                 ):
                     # add data to Request, e.g. cookies
-                    c = self.make_curl_handle(item, spider)
+                    try:
+                        c = self.make_curl_handle(item, spider)
+                    except Exception as e:
+                        spider._get_logger().error(
+                            "Error handle <{0} {1}> (referer: {2})".format(
+                                item.method, item.url, item.headers.get("referer")
+                            )
+                        )
+                        spider._get_logger().exception(e)
+                        continue
 
                     # ========== Middleware start ==========
                     get_new_queue_item = False

@@ -98,7 +98,7 @@ CREATE TABLE cookie (
 
         url_path = url_parsed.path if url_parsed.path else "/"
         top_domain = get_tld(url)
-        domain_list = [top_domain]
+        domain_list = [top_domain] if top_domain else []
         url_domain_split = url_domain.split(".")
         for i in range(len(url_domain_split)):
             subdomain = ".".join(url_domain_split[i:])

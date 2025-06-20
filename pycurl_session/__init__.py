@@ -152,6 +152,14 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 m.group(2), m.group(3), m.group(4), m.group(5), error=m.group(1),
                 reset=c_reset, method=c_method, times=c_times, url=c_url, color=color,
             )
+        # Error handle <{0} {1}> (referer: {2})
+        m = re.match("Error handle <(.*?) (.*)> \(referer: (.*)\)", msg)
+        if m and m.group(1):
+            color = self.ANSI_M_RED
+            return "{reset}{color}Error handle{reset} <{method}{0}{reset} {url}{1}{reset}> (referer: {url}{2}{reset})".format(
+                m.group(1), m.group(2), m.group(3),
+                reset=c_reset, method=c_method, url=c_url, color=color,
+            )
         return str(msg)
 
 

@@ -343,6 +343,8 @@ public_suffix_name = {
 def get_tld(url):
     ''' get top level domain '''
     hostname = urlparse(url).hostname
+    if not hostname:
+        return None
     suffix = hostname.split(".")[-1]
     l_suffix = len(suffix)
     if suffix in public_suffix_name:
