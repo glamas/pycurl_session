@@ -49,7 +49,8 @@ from pycurl_session.spider.schedule.Schedule(custom_settings={})
             - COOKIES_STORE_DB - cookie保存文件位置。默认为临时目录  
             - COOKIES_CLEAR - 启动时是否清空对应标识的cookie  
             - DOWNLOAD_TIMEOUT - 下载超时设置。默认30(second)  
-            - DOWNLOAD_DELAY - 相同域名请求延时。默认0(second)  
+            - DOWNLOAD_DELAY - 请求延时。默认0(second) 
+            - DOWNLOAD_DELAY_DOMAIN - (dict{domain: second}) 指定域名请求延时。取DOWNLOAD_DELAY较大者  
             - REDIRECT_ENABLED - 是否自动跳转请求。默认True  
             - RETRY_TIMES - 最大重试次数，默认3  
             - RETRY_HTTP_CODES - 重试状态码。默认[500, 502, 503, 504, 522, 524, 408, 429]  
