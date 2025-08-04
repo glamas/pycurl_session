@@ -242,6 +242,7 @@ class Schedule(object):
             if hasattr(c, "spider_request"): c.spider_request = None
             if hasattr(c, "meta"): c.meta = None
             if hasattr(c, "top_domain"): c.top_domain = None
+            if hasattr(c, "domain"): c.domain = None
             if hasattr(c, "spider_id"): c.spider_id = None
             if len(self.curl_pool) > self.curl_pool_max:
                 c.close()
@@ -266,8 +267,10 @@ class Schedule(object):
             if len(url_domain.split(".")) >= 2
             else url_domain
         )
-        if top_domain not in self.curl_handles:
-            self.curl_handles.update({top_domain: {"handles": [], "last": 0}})
+        if url_domain not in self.curl_handles:
+            delay = self.settings["DOWNLOAD_DELAY_DOMAIN"].get(url_domain)
+            if not delay: delay = self.settings["DOWNLOAD_DELAY"]
+            self.curl_handles.update({url_domain: {"handles": [], "delay": delay, "last": 0}})
         args = {
             "method": request.method,
             "headers": request.headers,
@@ -289,6 +292,7 @@ class Schedule(object):
         c = self.session.prepare_curl_handle(url=url, c=c, **args)
         c.meta = meta
         c.top_domain = top_domain
+        c.domain = url_domain
         c.spider_id = spider.spider_id
         c.max_retry_times = meta.get("max_retry_times", self.settings["RETRY_TIMES"])
         if meta.get("dont_retry", False):
@@ -339,9 +343,9 @@ class Schedule(object):
     def add_curl_handle(self, c):
         self.cm.add_handle(c)
         self.num_handles += 1
-        if c not in self.curl_handles[c.top_domain]["handles"]:
-            self.curl_handles[c.top_domain]["handles"].append(c)
-            self.curl_handles[c.top_domain]["last"] = time.time()
+        if c not in self.curl_handles[c.domain]["handles"]:
+            self.curl_handles[c.domain]["handles"].append(c)
+            self.curl_handles[c.domain]["last"] = time.time()
 
     def collect_curl_multi(self):
         if len(self.queue_pending) == 0:
@@ -396,14 +400,11 @@ class Schedule(object):
                 url = item.url
                 url_parsed = urlparse(url)
                 url_domain = url_parsed.netloc
-                top_domain = (
-                    url_domain[url_domain.find(".") :]
-                    if len(url_domain.split(".")) >= 2
-                    else url_domain
-                )
-                if top_domain not in self.curl_handles:
-                    self.curl_handles.update(
-                        {top_domain: {"handles": [], "last": 0}}
+                if url_domain not in self.curl_handles:
+                    delay = self.settings["DOWNLOAD_DELAY_DOMAIN"].get(url_domain)
+                    if not delay: delay = self.settings["DOWNLOAD_DELAY"]
+                    self.curl_handles.update({
+                        url_domain: {"handles": [], "delay": delay, "last": 0}}
                     )
                 # ========== RobotsTxt start ==========
                 if self.settings["ROBOTSTXT_OBEY"]:
@@ -426,8 +427,8 @@ class Schedule(object):
                         continue
                 # ========== RobotsTxt end ==========
                 if (
-                    time.time() - self.curl_handles[top_domain]["last"]
-                    > self.settings["DOWNLOAD_DELAY"]
+                    time.time() - self.curl_handles[url_domain]["last"]
+                    > self.curl_handles[url_domain]["delay"]
                 ):
                     # add data to Request, e.g. cookies
                     try:
@@ -551,9 +552,9 @@ class Schedule(object):
         spider = self.spider_instance[spider_id]
 
         self.cm.remove_handle(c)
-        if c in self.curl_handles[c.top_domain]["handles"]:
-            self.curl_handles[c.top_domain]["handles"].remove(c)
-            self.curl_handles[c.top_domain]["last"] = time.time() # todo
+        if c in self.curl_handles[c.domain]["handles"]:
+            self.curl_handles[c.domain]["handles"].remove(c)
+            self.curl_handles[c.domain]["last"] = time.time() # todo
 
         response = self.session.gather_response(c)
         response.meta = c.meta
@@ -603,7 +604,7 @@ class Schedule(object):
         spider = self.spider_instance[spider_id]
 
         self.cm.remove_handle(c)
-        self.curl_handles[c.top_domain]["handles"].remove(c)
+        self.curl_handles[c.domain]["handles"].remove(c)
         # ========== Middleware start ==========
         free_c = True
         get_new_queue_item = False
