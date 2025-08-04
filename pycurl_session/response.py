@@ -17,7 +17,7 @@ class Response(object):
         self.text = ""
         self.content_type = ""
         self.encoding = None
-        self.cookies = Cookies()
+        self.cookies = CookieJar()
         self.request = {}
         self.meta = {}
         self.session = session
@@ -334,14 +334,14 @@ class CookieItem:
         )
 
 
-class Cookies:
+class CookieJar:
     def __init__(self) -> None:
         self.data = []
 
     def clear(self):
         self.data.clear()
 
-    def set_cookie(self, name, value, domain, path, expires):
+    def set_cookie(self, name, value, domain, path="/", expires=None):
         self.data.append(CookieItem(name, value, domain, path, expires))
 
     def get_value(self, name, default=None, domain=None, path=None):

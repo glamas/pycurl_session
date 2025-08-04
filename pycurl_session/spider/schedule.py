@@ -19,7 +19,7 @@ from pycurl_session import Session, ColoredConsoleHandler
 from pycurl_session.response import Response
 from pycurl_session.spider import settings
 from pycurl_session.spider.exceptions import IgnoreRequest, DropItem, CloseSpider, PerformError, RetryRequest
-from pycurl_session.spider.middleware import Statistics, RobotsTxt, Cookies
+from pycurl_session.spider.middleware import Statistics, RobotsTxt, CookiesDebug
 from pycurl_session.spider.request import Request
 from pycurl_session.spider.task import TaskItem, Task
 
@@ -122,7 +122,7 @@ class Schedule(object):
     def set_middleware(self):
         # default middleware
         self.middleware.append(Statistics())
-        self.middleware.append(Cookies())
+        self.middleware.append(CookiesDebug())
         if "DOWNLOADER_MIDDLEWARES" not in self.settings:
             self.settings.update({"DOWNLOADER_MIDDLEWARES": []})
 

@@ -167,7 +167,7 @@ class RobotsTxt:
         return {"robots.txt": self.data_url}
 
 
-class Cookies:
+class CookiesDebug:
     def process_response(self, request, response, spider):
         if spider.settings["COOKIES_DEBUG"]:
             msg = ""
