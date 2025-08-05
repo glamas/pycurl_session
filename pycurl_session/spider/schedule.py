@@ -587,7 +587,8 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
         if get_new_queue_item:
-            response.content = None
+            response.content.seek(0)
+            response.content.truncate()
             del response
             self.put_curl_pool(c)
             return
@@ -595,7 +596,8 @@ class Schedule(object):
         # ========== process_response start ==========
         # self.process_response(response, c)
         if self.process_response(response, c):
-            response.content = None
+            response.content.seek(0)
+            response.content.truncate()
             del response
             self.put_curl_pool(c)
         # ========== process_response end ==========
