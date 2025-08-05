@@ -379,6 +379,7 @@ class Schedule(object):
                                 result.headers.update({
                                     "referer": self.response_ref[id(item)]
                                 })
+                                self.response_ref.pop(id(item))
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
