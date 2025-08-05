@@ -10,7 +10,7 @@ import time
 import gc
 
 from collections import deque
-from copy import deepcopy
+from copy import deepcopy, copy
 from inspect import isgenerator
 from urllib.parse import urlparse
 
@@ -332,6 +332,7 @@ class Schedule(object):
                 except StopIteration:
                     if id(item) in self.response_ref:
                         self.response_ref.pop(id(item))
+                        self.response_ref = copy(self.response_ref)
                     break
                 except CloseSpider as reason:
                     self.manual_close_task(spider, reason)
@@ -379,7 +380,6 @@ class Schedule(object):
                                 result.headers.update({
                                     "referer": self.response_ref[id(item)]
                                 })
-                                self.response_ref.pop(id(item))
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
@@ -388,6 +388,7 @@ class Schedule(object):
                     except StopIteration:
                         if id(item) in self.response_ref:
                             self.response_ref.pop(id(item))
+                            self.response_ref = copy(self.response_ref)
                         del queue_item
                         break
                     except CloseSpider as reason:
@@ -764,6 +765,8 @@ class Schedule(object):
                         "You can send CTRL-c again to shut down schedule. "
                         "Or wait for request done."
                     )
+                    # fix: when first send CTRL-c, clear queue_pending
+                    self.queue_pending.clear()
                     continue
                 else:
                     for spider_id, _ in self.spider_instance.items():
