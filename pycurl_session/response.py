@@ -22,6 +22,11 @@ class Response(object):
         self.meta = {}
         self.session = session
 
+    def __del__(self):
+        self.content.seek(0)
+        self.content.truncate()
+        self.cookies.clear()
+
     def xpath(self, xpath):
         if self.text == "":
             return Selector([])
