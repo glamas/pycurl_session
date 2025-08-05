@@ -23,9 +23,12 @@ class Response(object):
         self.session = session
 
     def __del__(self):
+        self.headers.clear()
         self.content.seek(0)
         self.content.truncate()
         self.cookies.clear()
+        self.request.clear()
+        self.meta.clear()
 
     def xpath(self, xpath):
         if self.text == "":

@@ -52,7 +52,7 @@ class Schedule(object):
         self.queue_pending = deque()
         self.queue_delay = deque()
         self.curl_pool = deque()
-        self.curl_pool_max = min(16, self.settings["CONCURRENT_REQUESTS"] / 2 + 1)
+        self.curl_pool_max = max(16, self.settings["CONCURRENT_REQUESTS"] * 2)
         self.curl_handles = {}
         self.num_handles = 0    # running handle count
 
@@ -237,15 +237,17 @@ class Schedule(object):
             return pycurl.Curl()
 
     def put_curl_pool(self, c):
+        c.reset()
         if hasattr(c, "in_pool") and c.in_pool == 1:
             self.session.init_curl_var(c)
-            if hasattr(c, "spider_request"): c.spider_request = None
-            if hasattr(c, "meta"): c.meta = None
+            if hasattr(c, "spider_request"): del c.spider_request
+            if hasattr(c, "meta"): c.meta.clear()
             if hasattr(c, "top_domain"): c.top_domain = None
             if hasattr(c, "domain"): c.domain = None
             if hasattr(c, "spider_id"): c.spider_id = None
             if len(self.curl_pool) > self.curl_pool_max:
                 c.close()
+                del c
             else:
                 self.curl_pool.append(c)
 
@@ -559,8 +561,8 @@ class Schedule(object):
             self.curl_handles[c.domain]["last"] = time.time() # todo
 
         response = self.session.gather_response(c)
-        response.meta = c.meta
-        response.headers = c.response_headers
+        response.meta = deepcopy(c.meta)
+        response.headers = deepcopy(c.response_headers)
 
         # ========== Middleware start ==========
         get_new_queue_item = False
@@ -643,9 +645,9 @@ class Schedule(object):
         if get_new_queue_item:
             self.put_curl_pool(c)
             return
-        # ========== Middleware end ==========
         if free_c:
             self.put_curl_pool(c)
+        # ========== Middleware end ==========
 
     def manual_close_task(self, spider, reason=None):
         spider_id = spider.spider_id
