@@ -315,7 +315,7 @@ class Schedule(object):
                 try:
                     # get next request and stop or raise
                     if id(item) not in self.response_ref:
-                        self.response_ref.update({id(item): response})
+                        self.response_ref.update({id(item): response.request["url"]})
                     result = next(item)
                     if isinstance(result, dict):
                         self.run_pipeline(result, spider)
@@ -377,7 +377,7 @@ class Schedule(object):
                         if isinstance(result, Request):
                             if id(item) in self.response_ref:
                                 result.headers.update({
-                                    "referer": self.response_ref[id(item)].request["url"]
+                                    "referer": self.response_ref[id(item)]
                                 })
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
