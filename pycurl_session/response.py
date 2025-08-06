@@ -5,6 +5,7 @@ import json
 import re
 from io import BytesIO
 from lxml import etree
+from copy import deepcopy
 from urllib.parse import urlparse, urljoin, unquote, quote
 
 
@@ -35,13 +36,19 @@ class Response(object):
             return Selector([])
         html = etree.HTML(self.text)
         result = html.xpath(xpath) if html is not None else []
-        return Selector(result)
+        result = deepcopy(result)
+        html.clear()
+        del html
+        return Selector((result))
 
     def css(self, css):
         if self.text == "":
             return Selector([])
         html = etree.HTML(self.text)
         result = html.cssselect(css)
+        result = deepcopy(result)
+        html.clear()
+        del html
         return Selector(result)
 
     def re(self, pattern, flags=re.I):
@@ -267,6 +274,9 @@ class Selector(object):
             else:
                 raise Exception("text is empty")
             result = html.xpath(xpath)
+            result = deepcopy(result)
+            html.clear()
+            del html
             return Selector(result)
         elif self.type == "SelectorList":
             ret = []
@@ -287,6 +297,9 @@ class Selector(object):
             else:
                 raise Exception("text is empty")
             result = html.cssselect(css)
+            result = deepcopy(result)
+            html.clear()
+            del html
             return Selector(result)
         elif self.type == "SelectorList":
             ret = []
