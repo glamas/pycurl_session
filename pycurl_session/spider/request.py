@@ -11,6 +11,7 @@ class Request(object):
     ):
         ''' Request: url, method, callback, meta, headers, cookies, dont_filter, cb_kwargs'''
         self.url = url
+        self.origin_url = None
         self.callback = callback
         self.meta = meta or {}
         # body > data > json

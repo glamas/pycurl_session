@@ -50,6 +50,8 @@ class RedisSpider(Spider):
     REDIS_PORT = 6379
     REDIS_PASSWORD = ""
     # REDIS_URL = "" # e.g. redis://user:pass@hostname:9001, use this first
+    REDIS_DB = 0
+    REDIS_SSL = False
     REDIS_START_URLS_KEY = ""
     REDIS_ENCODING = "utf-8" # latin1
 

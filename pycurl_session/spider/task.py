@@ -55,11 +55,25 @@ class Task(object):
                 if self.redis_encoding:
                     url = url.decode(self.redis_encoding)
                 request = Request(url=url, callback=self.spider.parse, headers={"referer": None})
+                request.origin_url = url
                 if hasattr(self.spider, "init_request"):
                     # can modify request when RedisSpider has init_request()
                     self.spider.init_request(request)
                 return TaskItem(self.spider.spider_id, request)
         return None
+
+    def put(self, spider_id, url):
+        if (hasattr(self, "spider")
+            and hasattr(self.spider, "spider_id")
+            and self.spider.spider_id == spider_id
+            and hasattr(self, "redis_server")
+            and isinstance(self.redis_server, (redis.Redis, redis.StrictRedis))
+        ):
+            key = self.get_redis_key()
+            if self.redis_key_type == "set":
+                self.redis_server.sadd(key, url)
+            elif self.redis_key_type == "list":
+                self.redis_server.lpush(key, url)
 
     def set_redis(self, spider):
         if hasattr(spider, "REDIS_HOST") and spider.REDIS_HOST:
@@ -74,8 +88,16 @@ class Task(object):
             server_password = spider.REDIS_PASSWORD
         else:
             server_password = None
+        if hasattr(spider, "REDIS_DB") and spider.REDIS_DB:
+            server_db = spider.REDIS_DB
+        else:
+            server_db = 0
         if hasattr(spider, "REDIS_ENCODING") and spider.REDIS_ENCODING:
             self.redis_encoding = spider.REDIS_ENCODING
+        if hasattr(spider, "REDIS_SSL") and spider.REDIS_SSL:
+            server_ssl = True if spider.REDIS_SSL else False
+        else:
+            server_ssl = False
         if platform.system() == "Windows":
             socket_keepalive_options = None
         else:
@@ -88,12 +110,16 @@ class Task(object):
             host=server_host,
             password=server_password,
             port=server_port,
+            db=server_db,
+            ssl=server_ssl,
             socket_keepalive=True,
             socket_connect_timeout=60,
             socket_keepalive_options=socket_keepalive_options,
             )
         key = self.get_redis_key()
         self.redis_key_type = self.redis_server.type(key)
+        if "b" == str(self.redis_key_type)[0]:
+            self.redis_key_type = self.redis_key_type.decode("utf-8")
         # self.get_last_time = time.time()
 
     def get_redis_key(self):

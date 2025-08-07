@@ -51,6 +51,7 @@ class Schedule(object):
         self.cm = pycurl.CurlMulti()
         self.queue_pending = deque()
         self.queue_delay = deque()
+        self.queue_pending_item = None
         self.curl_pool = deque()
         self.curl_pool_max = max(16, self.settings["CONCURRENT_REQUESTS"] * 2)
         self.curl_handles = {}
@@ -58,6 +59,7 @@ class Schedule(object):
 
         self.spider_instance = {}
         self.spider_task = {}
+        self.spider_task_done = set()
         self.middleware = []
         self.pipeline = []
         self.spider_close_reason = {}
@@ -89,6 +91,8 @@ class Schedule(object):
         ):
             headers["user-agent"] = custom_settings["USER_AGENT"]
         self.settings["DEFAULT_HEADERS"] = headers
+        if self.settings["CONCURRENT_REQUESTS"] <= 0:
+            self.settings["CONCURRENT_REQUESTS"] = 1
 
     def set_logger(self, name):
         logger = logging.getLogger(name)
@@ -221,12 +225,12 @@ class Schedule(object):
 
     def get_queue_item(self):
         for spider_id, _ in self.spider_instance.items():
-            if len(self.spider_task) == 0:
-                break
+            if spider_id in self.spider_task_done:
+                continue
             if spider_id in self.spider_task:
                 item = self.spider_task[spider_id].get()
                 if item is None:
-                    self.spider_task.pop(spider_id)
+                    self.spider_task_done.add(spider_id)
                 elif isinstance(item, TaskItem):
                     yield item
 
@@ -359,15 +363,18 @@ class Schedule(object):
                     self.put_pending_taskitem(queue_item)
             except StopIteration:
                 pass
-        # queue_delay, first in first out.
+
+        # ========== loop start ==========
         self.queue_delay.clear()
         while len(self.queue_pending) > 0:
-            count = self.settings["CONCURRENT_REQUESTS"] - self.num_handles
-            if count <= 0:
+            if self.num_handles >= self.settings["CONCURRENT_REQUESTS"]:
                 break
             queue_item = self.queue_pending.popleft()
             spider_id, item = queue_item.spider_id, queue_item.item
             spider = self.spider_instance[spider_id]
+            # record current item.
+            # while loop, item must in queue_pending or queue_delay or queue_pending_item
+            self.queue_pending_item = queue_item
             if isgenerator(item):
                 # ========== process isgenerator start ==========
                 while True:
@@ -391,6 +398,7 @@ class Schedule(object):
                         if id(item) in self.response_ref:
                             self.response_ref.pop(id(item))
                             self.response_ref = copy(self.response_ref)
+                        self.queue_pending_item = None
                         del queue_item
                         break
                     except CloseSpider as reason:
@@ -427,12 +435,13 @@ class Schedule(object):
                             self.queue_delay.append(TaskItem(spider_id, item))
                             continue
                     except IgnoreRequest:
+                        self.queue_pending_item = None
                         del queue_item
                         continue
                 # ========== RobotsTxt end ==========
                 if (
                     time.time() - self.curl_handles[url_domain]["last"]
-                    > self.curl_handles[url_domain]["delay"]
+                    >= self.curl_handles[url_domain]["delay"]
                 ):
                     # add data to Request, e.g. cookies
                     try:
@@ -473,6 +482,7 @@ class Schedule(object):
                                 spider._get_logger().exception(e)
 
                     if get_new_queue_item:
+                        self.queue_pending_item = None
                         del queue_item
                         self.put_curl_pool(c)
                         continue
@@ -481,12 +491,15 @@ class Schedule(object):
                     del queue_item
                 else:
                     self.queue_delay.append(queue_item)
+                    self.queue_pending_item = None
                 # ========== process request end ==========
 
-            # get more TaskItem, if all item put to curl or queue_delay
+            # if all item put to curl or queue_delay,
+            # get TaskItem until num_handles hit CONCURRENT_REQUESTS
             if (len(self.queue_pending) == 0
                 and self.num_handles < self.settings["CONCURRENT_REQUESTS"]
-                # and len(self.queue_delay) == 0
+                # NOTE: queue_delay will quickly increase if TaskItem not put to curl.
+                and len(self.queue_delay) < self.settings["CONCURRENT_REQUESTS"] * (len(self.curl_handles.keys()) + 1)
             ):
                 try:
                     queue_item = next(self.get_queue_item())
@@ -494,6 +507,7 @@ class Schedule(object):
                         self.put_pending_taskitem(queue_item)
                 except StopIteration:
                     pass
+        # ========== loop start ==========
 
         # put back to queue_pending
         while len(self.queue_delay) > 0:
@@ -551,14 +565,24 @@ class Schedule(object):
                 return False
         return self.run_request_callback(c.spider_request, response, spider)
 
+    def recycle_curl(self, c, recycle=True):
+        if recycle:
+            self.cm.remove_handle(c)
+            if c in self.curl_handles[c.domain]["handles"]:
+                self.curl_handles[c.domain]["handles"].remove(c)
+            self.put_curl_pool(c)
+        else:
+            if c in self.curl_handles[c.domain]["handles"]:
+                self.curl_handles[c.domain]["last"] = time.time()
+
     def process_curl_multi_ok(self, c):
+        ret = True  # return True if c is no more use, and can be remove from cm and curl_handles
         spider_id = c.spider_id
         spider = self.spider_instance[spider_id]
 
-        self.cm.remove_handle(c)
         if c in self.curl_handles[c.domain]["handles"]:
-            self.curl_handles[c.domain]["handles"].remove(c)
-            self.curl_handles[c.domain]["last"] = time.time() # todo
+            # request finish. can add new c. but if return False, need update.
+            self.curl_handles[c.domain]["last"] = time.time()
 
         response = self.session.gather_response(c)
         response.meta = deepcopy(c.meta)
@@ -590,23 +614,21 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
         if get_new_queue_item:
+            # new request, no need to process response
             del response
-            self.put_curl_pool(c)
-            return
+            return ret
         # ========== Middleware end ==========
         # ========== process_response start ==========
-        # self.process_response(response, c)
-        if self.process_response(response, c):
-            del response
-            self.put_curl_pool(c)
+        ret = self.process_response(response, c)
+        # ret = False means c redirect or retry, keep response and c.
+        if ret: del response
+        return ret
         # ========== process_response end ==========
 
     def process_curl_multi_err(self, c, errno, errmsg):
         spider_id = c.spider_id
         spider = self.spider_instance[spider_id]
 
-        self.cm.remove_handle(c)
-        self.curl_handles[c.domain]["handles"].remove(c)
         # ========== Middleware start ==========
         free_c = True
         get_new_queue_item = False
@@ -643,18 +665,48 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
         if get_new_queue_item:
-            self.put_curl_pool(c)
-            return
-        if free_c:
-            self.put_curl_pool(c)
+            return True
+        return free_c
         # ========== Middleware end ==========
 
     def manual_close_task(self, spider, reason=None):
         spider_id = spider.spider_id
+        if spider_id in self.spider_task_done:
+            return
         spider.log("{} raise CloseSpider(). No more new request will be added to queue.".format(spider_id))
-        if spider_id in self.spider_task:
-            self.spider_task.pop(spider_id)
         self.spider_close_reason.update({spider_id: reason})
+        if spider_id in self.spider_task:
+            self.spider_task_done.add(spider_id)
+            # put back redis if needed
+            # queue_pending_item
+            if (self.queue_pending_item
+                and self.queue_pending_item[0] == spider_id
+                and self.queue_pending_item[1].origin_url
+            ):
+                self.spider_task[spider_id].put(spider_id, self.queue_pending_item[1].origin_url)
+                self.queue_pending_item = None
+            # queue_pending
+            temp_queue = deque()
+            while len(self.queue_pending) > 0:
+                item = self.queue_pending.popleft()
+                if item[0] == spider_id:
+                    if item[1].origin_url:
+                        self.spider_task[spider_id].put(spider_id, item[1].origin_url)
+                else:
+                    temp_queue.appendleft(item)
+            while len(temp_queue) > 0:
+                self.queue_pending.appendleft(temp_queue.popleft())
+            # queue_delay
+            while len(self.queue_delay) > 0:
+                item = self.queue_delay.popleft()
+                if item[0] == spider_id:
+                    if item[1].origin_url:
+                        self.spider_task[spider_id].put(spider_id, item[1].origin_url)
+                else:
+                    temp_queue.appendleft(item)
+            while len(temp_queue) > 0:
+                self.queue_delay.appendleft(temp_queue.popleft())
+
 
     def process_close_call(self):
         for spider_id, spider in self.spider_instance.items():
@@ -680,6 +732,24 @@ class Schedule(object):
                 except Exception as e:
                     spider._get_logger().exception(e)
 
+    def interrupt_rollback_item(self, spider_id=None):
+        if self.queue_pending_item:
+            self.queue_pending.appendleft(self.queue_pending_item)
+        while len(self.queue_delay):
+            self.queue_pending.appendleft(self.queue_delay.popleft())
+        try:
+            while len(self.queue_pending) > 0:
+                item = self.queue_pending.popleft()
+                if item[0] in self.spider_task and item[1].origin_url:
+                    self.spider_task[item[0]].put(item[0], item[1].origin_url)
+            count = 0
+            for _, item in self.curl_handles.items():
+                for c in item["handles"]:
+                    if c.spider_id in self.spider_task and c.spider_request.origin_url:
+                        self.spider_task[c.spider_id].put(c.spider_id, c.spider_request.origin_url)
+                        count += 1
+        except Exception as e:
+            self.logger.exception(e)
 
     def run(self):
         if not self.init_success: return
@@ -738,11 +808,13 @@ class Schedule(object):
                     running_handles = self.num_handles
                     num_q, ok_list, err_list = self.cm.info_read()
                     for c in ok_list:
-                        self.process_curl_multi_ok(c)
+                        recycle = self.process_curl_multi_ok(c)
+                        self.recycle_curl(c, recycle)
                         per_min_page += 1
 
                     for c, errno, errmsg in err_list:
-                        self.process_curl_multi_err(c, errno, errmsg)
+                        recycle = self.process_curl_multi_err(c, errno, errmsg)
+                        self.recycle_curl(c, recycle)
                         per_min_page += 1
 
                     if time.time() - gc_time > 60:
@@ -767,9 +839,11 @@ class Schedule(object):
                         "You can send CTRL-c again to shut down schedule. "
                         "Or wait for request done."
                     )
-                    # fix: when first send CTRL-c, clear queue_pending
-                    self.queue_pending.clear()
-                    continue
+                    # fix: when first send CTRL-c, put item back if needed
+                    # self.queue_pending.clear()
+                    self.interrupt_rollback_item()
+                    # continue
+                    break
                 else:
                     for spider_id, _ in self.spider_instance.items():
                         if spider_id not in self.spider_close_reason:
@@ -787,6 +861,7 @@ class Schedule(object):
         self.curl_handles.clear()
         self.response_ref.clear()   # important
         self.cm.close()
+        self.spider_task.clear()
 
         # ========== logstat start ==========
         if self.settings["ROBOTSTXT_OBEY"]:
