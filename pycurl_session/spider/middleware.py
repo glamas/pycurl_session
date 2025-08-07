@@ -88,6 +88,11 @@ class Statistics:
             time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.stat["time_start"])),
             int(self.stat["time_start"] * 1000) % 1000
         )
+        self.stat["time_used_s"] = "{0}:{1:02}:{2:02}".format(
+            int(self.stat["time_used"] / 3600),
+            int(self.stat["time_used"] % 3600 / 60),
+            int(self.stat["time_used"] % 60)
+        )
         return self.stat
 
 
