@@ -840,10 +840,8 @@ class Schedule(object):
                         "Or wait for request done."
                     )
                     # fix: when first send CTRL-c, put item back if needed
-                    # self.queue_pending.clear()
                     self.interrupt_rollback_item()
-                    # continue
-                    break
+                    continue
                 else:
                     for spider_id, _ in self.spider_instance.items():
                         if spider_id not in self.spider_close_reason:
