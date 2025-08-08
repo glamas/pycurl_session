@@ -340,7 +340,18 @@ class Schedule(object):
                         result.headers.update({
                             "referer": response.request["url"]
                         })
-                        result.origin_url = response.request["origin_url"]
+                        # new request persist origin_url if:
+                        # Spider.URL_PERSIST = True
+                        # request.meta has not 'url_persist' or its value is True
+                        url_persist = False
+                        if (spider_id in self.spider_instance
+                            and hasattr(self.spider_instance[spider_id], "URL_PERSIST")
+                        ):
+                            url_persist = self.spider_instance[spider_id].URL_PERSIST
+                        if url_persist:
+                            url_persist_in_meta = result.meta.get("url_persist")
+                            if url_persist_in_meta is None or url_persist_in_meta:
+                                result.origin_url = response.request["origin_url"]
                         self.put_pending_taskitem(TaskItem(spider_id, result))
                         self.put_pending_taskitem(TaskItem(spider_id, item))
                         break
