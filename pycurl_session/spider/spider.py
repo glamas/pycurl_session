@@ -12,8 +12,10 @@ class Spider(object):
     def __init__(self):
         self.start_urls = []
 
-    # def start_request(self):
-    #     pass
+    def init_spider(self):
+        # do some work with self._session and self.settings
+        # which can not touch when __init__()
+        pass
 
     def parse(self, response):
         pass
@@ -54,10 +56,11 @@ class RedisSpider(Spider):
     REDIS_SSL = False
     REDIS_START_URLS_KEY = ""
     REDIS_ENCODING = "utf-8" # latin1
-
-    def __init__(self):
-        # no start_urls
-        pass
+    # if set True, origin_url will attach to every request start from it.
+    # if set False, only the request made from redis url will attach origin_url.
+    # if request.meta has "url_persist" and its value is False, end attach to new request.
+    # when raise KeyboardInterrupt, request which has origin_url will put back to redis.
+    URL_PERSIST = True
 
     def init_request(self, req: Request):
         req.callback = self.parse

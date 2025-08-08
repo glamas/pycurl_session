@@ -211,6 +211,13 @@ class Schedule(object):
             setattr(instance, "_session", self.session)
         if not hasattr(instance, "settings"):
             setattr(instance, "settings", deepcopy(self.settings))
+        if hasattr(instance, "init_spider"):
+            try:
+                instance.init_spider()
+            except Exception as e:
+                self.logger.error("Spider [{0}] run init_spider() failed: {1}".format(spider_name, e))
+                self.init_success = False
+                return
         spider_id = instance.spider_id
         self.set_logger(spider_id)
         self.spider_instance.update({spider_id: instance})
@@ -393,7 +400,18 @@ class Schedule(object):
                                 result.headers.update({
                                     "referer": self.response_ref[id(item)]["url"]
                                 })
-                                result.origin_url = self.response_ref[id(item)]["origin_url"]
+                                # new request persist origin_url if:
+                                # Spider.URL_PERSIST = True
+                                # request.meta has not 'url_persist' or its value is True
+                                url_persist = False
+                                if (spider_id in self.spider_instance
+                                    and hasattr(self.spider_instance[spider_id], "URL_PERSIST")
+                                ):
+                                    url_persist = self.spider_instance[spider_id].URL_PERSIST
+                                if url_persist:
+                                    url_persist_in_meta = result.meta.get("url_persist")
+                                    if url_persist_in_meta is None or url_persist_in_meta:
+                                        result.origin_url = self.response_ref[id(item)]["origin_url"]
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
