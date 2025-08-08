@@ -28,6 +28,7 @@ class Task(object):
         self.redis_key = None
         self.redis_key_type = None
         self.redis_encoding = None
+        self.redis_url_filter = set()
 
         if hasattr(spider, "start_requests"):
             gen_func = spider.start_requests()
@@ -68,12 +69,14 @@ class Task(object):
             and self.spider.spider_id == spider_id
             and hasattr(self, "redis_server")
             and isinstance(self.redis_server, (redis.Redis, redis.StrictRedis))
+            and url not in self.redis_url_filter
         ):
             key = self.get_redis_key()
             if self.redis_key_type == "set":
                 self.redis_server.sadd(key, url)
             elif self.redis_key_type == "list":
                 self.redis_server.lpush(key, url)
+            self.redis_url_filter.add(url)      # action once
 
     def set_redis(self, spider):
         if hasattr(spider, "REDIS_HOST") and spider.REDIS_HOST:
