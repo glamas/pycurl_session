@@ -321,7 +321,10 @@ class Schedule(object):
                 try:
                     # get next request and stop or raise
                     if id(item) not in self.response_ref:
-                        self.response_ref.update({id(item): response.request["url"]})
+                        self.response_ref.update({id(item): {
+                            "url": response.request["url"],
+                            "origin_url": response.request["origin_url"]
+                        }})
                     result = next(item)
                     if isinstance(result, dict):
                         self.run_pipeline(result, spider)
@@ -330,6 +333,7 @@ class Schedule(object):
                         result.headers.update({
                             "referer": response.request["url"]
                         })
+                        result.origin_url = response.request["origin_url"]
                         self.put_pending_taskitem(TaskItem(spider_id, result))
                         self.put_pending_taskitem(TaskItem(spider_id, item))
                         break
@@ -387,8 +391,9 @@ class Schedule(object):
                         if isinstance(result, Request):
                             if id(item) in self.response_ref:
                                 result.headers.update({
-                                    "referer": self.response_ref[id(item)]
+                                    "referer": self.response_ref[id(item)]["url"]
                                 })
+                                result.origin_url = self.response_ref[id(item)]["origin_url"]
                             self.put_pending_taskitem(TaskItem(spider_id, item))
                             self.put_pending_taskitem(TaskItem(spider_id, result))
                             break
@@ -527,6 +532,7 @@ class Schedule(object):
                 and response.meta["dont_redirect"] != True
             )
         ):
+            self.cm.remove_handle(c)
             self.session._response_redirect(c, response.status_code, logger_handle=self.logger)
             if self.settings["ROBOTSTXT_OBEY"]:
                 # check new url top_domain if robotstxt check enabled
@@ -557,11 +563,12 @@ class Schedule(object):
             )
         )
         if response.status_code in self.session.retry_http_codes:
+            self.cm.remove_handle(c)
             self.session._response_retry(
                 c, logger_handle=self.logger,
             )
+            self.add_curl_handle(c)
             if c.retry <= c.max_retry_times:
-                self.add_curl_handle(c)
                 return False
         return self.run_request_callback(c.spider_request, response, spider)
 
@@ -587,6 +594,7 @@ class Schedule(object):
         response = self.session.gather_response(c)
         response.meta = deepcopy(c.meta)
         response.headers = deepcopy(c.response_headers)
+        response.request.update({"origin_url": c.spider_request.origin_url})
 
         # ========== Middleware start ==========
         get_new_queue_item = False
@@ -653,6 +661,7 @@ class Schedule(object):
                 except RetryRequest:
                     c.retry += 1
                     if c.retry <= c.max_retry_times:
+                        self.cm.remove_handle(c)
                         self.add_curl_handle(c)
                         free_c = False
                         # middleware control log
