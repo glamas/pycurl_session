@@ -267,16 +267,19 @@ class Selector(object):
 
     def xpath(self, xpath):
         if self.type == "Selector":
+            to_clear = False
             if self.ele is not None:
                 html = self.ele
             elif self.text:
                 html = etree.HTML(self.text)
+                to_clear = True
             else:
                 raise Exception("text is empty")
             result = html.xpath(xpath)
             result = deepcopy(result)
-            html.clear()
-            del html
+            if to_clear:
+                html.clear()
+                del html
             return Selector(result)
         elif self.type == "SelectorList":
             ret = []
@@ -290,16 +293,19 @@ class Selector(object):
 
     def css(self, css):
         if self.type == "Selector":
+            to_clear = False
             if self.ele is not None:
                 html = self.ele
             elif self.text:
                 html = etree.HTML(self.text)
+                to_clear = True
             else:
                 raise Exception("text is empty")
             result = html.cssselect(css)
             result = deepcopy(result)
-            html.clear()
-            del html
+            if to_clear:
+                html.clear()
+                del html
             return Selector(result)
         elif self.type == "SelectorList":
             ret = []
