@@ -620,7 +620,8 @@ class Schedule(object):
             # request finish. can add new c. but if return False, need update.
             self.curl_handles[c.domain]["last"] = time.time()
 
-        response = self.session.gather_response(c)
+        response = Response(session=self.session)
+        self.session.gather_response(c, response)
         response.meta = deepcopy(c.meta)
         response.headers = deepcopy(c.response_headers)
         response.request.update({"origin_url": c.spider_request.origin_url})
