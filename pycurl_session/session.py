@@ -129,13 +129,13 @@ class Session(object):
         return self.send(c)
 
     def send(self, c):
-        response = Response()
+        response = Response(session=self)
         while True:
             if c.retry > c.max_retry_times:
                 break
             try:
                 c.perform()
-                response = self.gather_response(c)
+                self.gather_response(c, response)
                 if response.status_code in self.redirect_http_codes and c.allow_redirects:
                     self._response_redirect(c, response.status_code, logger_handle=logger)
                     continue
@@ -474,8 +474,7 @@ class Session(object):
         c.setopt(c.HTTPHEADER, headers_list)
         return c
 
-    def gather_response(self, c):
-        response = Response(session=self)
+    def gather_response(self, c, response):
         response.status_code = c.getinfo(pycurl.RESPONSE_CODE)
         response.headers = c.response_headers
         response.content = c.buffer
@@ -489,7 +488,6 @@ class Session(object):
         )
         self._response_decode(response)  # guess response.text
         self.save_cookies(response, c.session_id)
-        return response
 
     def _set_ssl(self, c):
         if c.cert:
