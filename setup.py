@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='pycurl_session',
-    version='0.7.0',
+    version='0.7.1',
     description='Base on pycurl, session like requests, spider like scrapy',
     url='https://github.com/glamas/pycurl_session',
     author='glamas',

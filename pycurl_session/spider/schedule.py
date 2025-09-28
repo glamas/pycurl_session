@@ -623,7 +623,7 @@ class Schedule(object):
         response = Response(session=self.session)
         self.session.gather_response(c, response)
         response.meta = deepcopy(c.meta)
-        response.headers = deepcopy(c.response_headers)
+        response.headers = deepcopy(c.header_handler.headers)
         response.request.update({"origin_url": c.spider_request.origin_url})
 
         # ========== Middleware start ==========
