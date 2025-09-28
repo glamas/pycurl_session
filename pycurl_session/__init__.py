@@ -94,7 +94,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
         c_time = self.ANSI_M_MAGENTA
         c_times = self.ANSI_M_CYAN
         # ({0}) <{1} {2} {3}s> (referer: {4})
-        m = re.match("\((.*?)\) <(.*?) (.*) (.*)s> \(referer: (.*)\)", msg)
+        m = re.match(r"\((.*?)\) <(.*?) (.*) (.*)s> \(referer: (.*)\)", msg)
         if m and m.group(1):
             return "{reset}({code}{0}{reset}) <{method}{1}{reset} {url}{2}{reset} {time}{3}{reset}s> (referer: {url}{4}{reset})".format(
                 m.group(1), m.group(2), m.group(3), m.group(4), m.group(5),
@@ -102,7 +102,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 code=self.get_code_colour(m.group(1)),
             )
         # ({0}) to <Redirect {1}> from <{2} {3} {4}s> (referer: {5})
-        m = re.match("\((.*?)\) to <Redirect (.*)> from <(.*?) (.*) (.*)s> \(referer: (.*)\)", msg)
+        m = re.match(r"\((.*?)\) to <Redirect (.*)> from <(.*?) (.*) (.*)s> \(referer: (.*)\)", msg)
         if m and m.group(1):
             return "{reset}({code}{0}{reset}) to <{method}Redirect{reset} {url}{1}{reset}> from <{method}{2}{reset} {url}{3}{reset} {time}{4}{reset}s> (referer: {url}{5}{reset})".format(
                 m.group(1), m.group(2), m.group(3), m.group(4), m.group(5), m.group(6),
@@ -110,42 +110,42 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 code=self.get_code_colour(m.group(1)),
             )
         # Crawled {0} pages and handle {1} items (last minute {2} pages and {3} items), passed {4} minites
-        m = re.match("Crawled (\d+) pages and handle (\d+) items \(last minute (\d+) pages and (\d+) items\), passed (\d+) minites", msg)
+        m = re.match(r"Crawled (\d+) pages and handle (\d+) items \(last minute (\d+) pages and (\d+) items\), passed (\d+) minites", msg)
         if m and m.group(1):
             return "{reset}Crawled {times}{0}{reset} pages and handle {times}{1}{reset} items (last minute {times}{2}{reset} pages and {times}{3}{reset} items), passed {times}{4}{reset} minites".format(
                 m.group(1), m.group(2), m.group(3), m.group(4), m.group(5),
                 reset=c_reset, times=c_times,
             )
         # Retry #{0} [after {1}s] {2}
-        m = re.match("Retry #(.*?) \[after (.*?)s\] (.*)", msg)
+        m = re.match(r"Retry #(.*?) \[after (.*?)s\] (.*)", msg)
         if m and m.group(1):
             return "{reset}Retry {times}#{0}{reset} [after {time}{1}{reset}s] {url}{2}{reset}".format(
                 m.group(1), m.group(2), m.group(3),
                 reset=c_reset, times=c_times, time=c_time, url=c_url,
             )
         # Failed to process <{0} {1}>, try max time.
-        m = re.match("Failed to process <(.*?) (.*)>, try max time.", msg)
+        m = re.match(r"Failed to process <(.*?) (.*)>, try max time.", msg)
         if m and m.group(1):
             return "{reset}Failed to process <{method}{0}{reset} {url}{1}{reset}>, try max time.".format(
                 m.group(1), m.group(2),
                 reset=c_reset, method=c_method, url=c_url,
             )
         # Failed with no retry <{0} {1}>
-        m = re.match("Failed with no retry <(.*?) (.*)>", msg)
+        m = re.match(r"Failed with no retry <(.*?) (.*)>", msg)
         if m and m.group(1):
             return "{reset}Failed with no retry <{method}{0}{reset} {url}{1}{reset}>".format(
                 m.group(1), m.group(2),
                 reset=c_reset, method=c_method, url=c_url,
             )
         # Retry [{0}] {1}
-        m = re.match("Retry \[(.*)\] (.*)", msg)
+        m = re.match(r"Retry \[(.*)\] (.*)", msg)
         if m and m.group(1):
             return "{reset}Retry [{times}{0}{reset}] {url}{1}{reset}".format(
                 m.group(1), m.group(2),
                 reset=c_reset, method=c_method, times=c_times, url=c_url,
             )
         # Timeout/Error ({0}, {1}) when <{2} {3}>
-        m = re.match("(Timeout|Error) \((.*?), (.*)\) when <(.*?) (.*)>", msg)
+        m = re.match(r"(Timeout|Error) \((.*?), (.*)\) when <(.*?) (.*)>", msg)
         if m and m.group(1):
             color = self.ANSI_M_YELLOW if m.group(1) == "Timeout" else self.ANSI_M_RED
             return "{reset}{color}{error}{reset} ({times}{0}{reset}, {1}) when <{method}{2}{reset} {url}{3}{reset}>".format(
@@ -153,7 +153,7 @@ class ColoredConsoleHandler(logging.StreamHandler):
                 reset=c_reset, method=c_method, times=c_times, url=c_url, color=color,
             )
         # Error handle <{0} {1}> (referer: {2})
-        m = re.match("Error handle <(.*?) (.*)> \(referer: (.*)\)", msg)
+        m = re.match(r"Error handle <(.*?) (.*)> \(referer: (.*)\)", msg)
         if m and m.group(1):
             color = self.ANSI_M_RED
             return "{reset}{color}Error handle{reset} <{method}{0}{reset} {url}{1}{reset}> (referer: {url}{2}{reset})".format(

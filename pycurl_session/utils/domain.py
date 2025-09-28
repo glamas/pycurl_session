@@ -354,7 +354,7 @@ def get_tld(url):
             re_s = public_suffix_len[l_suffix]
         else:
             return hostname
-    pattern = "([\w|-]+)\.({0})$".format(re_s)
+    pattern = r"([\w|-]+)\.({0})$".format(re_s)
     m = re.search(pattern, hostname)
     if m and m.group(1) and m.group(2):
         return "{0}.{1}".format(m.group(1), m.group(2))
