@@ -179,20 +179,21 @@ class Response(object):
             dir_path_exists = False
         if self.content:
             self.content.seek(0)
-        if self.content.getbuffer().nbytes > 0:
+        nbytes = self.content.getbuffer().nbytes
+        if nbytes > 0:
             if not dir_path_exists:
                 os.makedirs(dir_path)
             with open(path, "wb") as f:
-                f.write(self.content.getbuffer())
-                return True
+                f.write(self.content.getvalue())
+                return nbytes
         elif self.text:
             if not dir_path_exists:
                 os.makedirs(dir_path)
             enc = self.encoding if self.encoding else encoding
             with open(path, "w", encoding=enc) as f:
                 f.write(self.text)
-                return True
-        return False
+                return len(self.text.encode(enc))
+        return 0
 
 
 class Selector(object):
