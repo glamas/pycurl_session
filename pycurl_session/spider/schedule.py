@@ -310,6 +310,7 @@ class Schedule(object):
         c.max_retry_times = meta.get("max_retry_times", self.settings["RETRY_TIMES"])
         if meta.get("dont_retry", False):
             c.max_retry_times = 0
+        self.session.set_http_version(c, meta.get("http_version", None))
 
         request.cookies = c.request["cookies"]
         request.headers = c.request["headers"]

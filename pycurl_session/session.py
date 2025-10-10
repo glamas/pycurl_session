@@ -77,6 +77,8 @@ class Session(object):
         self.retry_http_codes = [500, 502, 503, 504, 522, 524, 408, 429]
         self.redirect_http_codes = [301, 302, 303, 307, 308]
         self.simulate_fetch = False
+        # (string) one of [1_0, 1.0, 1_1, 1.1, 2, 2_0, 2.0, 2TLS, 2_PRIOR_KNOWLEDGE, 3, 3_0, 3.0, 3ONLY]
+        self.http_version = None    # None for default
 
         # set by function
         self._max_retry_times = 3
@@ -91,6 +93,38 @@ class Session(object):
 
         # private
         self._fh = None
+        self._hv = self.get_http_version()
+
+    def get_http_version(self):
+        # https://curl.se/libcurl/c/CURLOPT_HTTP_VERSION.html
+        ver = self.version_info[1].split(".")
+        if int(ver[0]) > 8 or (int(ver[0]) == 8 and int(ver[1]) >= 13):
+            return pycurl.CURL_HTTP_VERSION_NONE
+        elif int(ver[0]) == 8 or (int(ver[0]) == 7 and int(ver[1]) >= 62):
+            return pycurl.CURL_HTTP_VERSION_2TLS
+        else:
+            return pycurl.CURL_HTTP_VERSION_1_1
+
+    def set_http_version(self, c, http_version=None):
+        hv = http_version or self.http_version
+        if c.hv != hv:
+            # http version change, update c.hv, FRESH_CONNECT and HTTP_VERSION
+            c.hv = hv
+            c.setopt(c.FRESH_CONNECT, 1)
+            if not hv:
+                # None to default
+                c.setopt(c.HTTP_VERSION, self._hv)
+            else:
+                if not isinstance(hv, str):
+                    hv = str(hv).upper()
+                hv = hv.replace(".", "_").strip()
+                if hv == "1": hv = "1_0"
+                if hv == "2": hv = "2_0"
+                if hv == "3_0": hv = "3"
+                c.setopt(c.HTTP_VERSION, getattr(pycurl, "CURL_HTTP_VERSION_{0}".format(hv)))
+        else:
+            # http version remain, just update FRESH_CONNECT
+            c.setopt(c.FRESH_CONNECT, 0)
 
     def set_cookie_db(self, cookie_db_path):
         dir_path = os.path.dirname(cookie_db_path)
@@ -142,6 +176,7 @@ class Session(object):
                 c = args["c"]
             args.pop("c")
         c = self.prepare_curl_handle(method, url=url, c=c, **args)
+        self.set_http_version(c)
         return self.send(c)
 
     def send(self, c):
@@ -206,6 +241,7 @@ class Session(object):
         if not hasattr(c, "proxy"): c.proxy = ""
         if not hasattr(c, "cert"): c.cert = ""
         if not hasattr(c, "verify"): c.verify = True
+        if not hasattr(c, "hv"): c.hv = self.http_version
         # for spider
         # if hasattr(c, "spider_request"): c.spider_request = None
 
@@ -266,6 +302,7 @@ class Session(object):
                 proxy: str
                 cert: str
                 verify: bool
+                hv: str
         '''
         if c is None:
             c = pycurl.Curl()
