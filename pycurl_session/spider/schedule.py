@@ -82,8 +82,8 @@ class Schedule(object):
             else:
                 self.settings[k] = v
         headers = settings.DEFAULT_HEADERS
-        if "DEFAULT_REQUEST_HEADERS" in custom_settings:
-            for k, v in custom_settings["DEFAULT_REQUEST_HEADERS"].items():
+        if "DEFAULT_HEADERS" in custom_settings:
+            for k, v in custom_settings["DEFAULT_HEADERS"].items():
                 headers.update({k.lower(): v})
         if (
             "USER_AGENT" in custom_settings
