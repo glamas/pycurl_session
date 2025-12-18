@@ -326,6 +326,8 @@ class Session(object):
         c.setopt(c.WRITEFUNCTION, c.body_handler.write)
 
         self._set_proxy(c, proxy)
+        if cert:
+            c.cert = cert
 
         # reconstruct url
         url_info = urlparse(url)
@@ -568,6 +570,8 @@ class Session(object):
                 request_headers.update({k.lower(): v})
                 if k.lower() == "referer":
                     request_referer = v
+                    if request_referer == "" or request_referer is None:
+                        request_headers.pop("referer")
                 # if k.lower() == "user-agent":
                 #     c.setopt(c.USERAGENT,v)
                 #     self.useragent = v
@@ -583,6 +587,8 @@ class Session(object):
                     request_headers.update({t[0].lower(): t[1]})
                     if t[0].lower() == "referer":
                         request_referer = t[1]
+                        if request_referer == "" or request_referer is None:
+                            request_headers.pop("referer")
                     # if t[0].lower() == "user-agent":
                     #     c.setopt(c.USERAGENT,t[1])
                     #     self.useragent = v
